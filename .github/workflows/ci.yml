@@ -5,42 +5,104 @@ on:
     branches: ['**']
   pull_request:
 
+# One run per ref. Superseded runs are cancelled — a review only ever cares
+# about the result for the current head.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  verify:
-    name: Typecheck, test, build
+  quality:
+    name: Format, lint, typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
+
+      # Run each check even when an earlier one fails, so a contributor sees
+      # every problem in one CI round instead of one per push.
+      - name: Formatting
+        if: ${{ !cancelled() }}
+        run: npm run format:check
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
 
       - name: Typecheck
+        if: ${{ !cancelled() }}
         run: npm run typecheck
 
-      - name: Unit tests
-        run: npm test
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor from package.json engines, plus current LTS.
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Production build
-        run: npx vite build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: Build & size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npx vite build
 
       - name: Check bundle size budget
-        # The game ships as a single self-contained bundle with no art or audio
-        # assets, so a sudden jump in size means something was pulled in by
-        # accident. 250 KB uncompressed is roughly 3x the current build.
+        # The game ships one self-contained bundle with no art or audio assets,
+        # so a jump in size means something was pulled in by accident. The
+        # budget is roughly 3x the current build — loose enough not to nag,
+        # tight enough to catch an errant dependency.
         run: |
-          size=$(find dist/assets -name '*.js' -not -name '*.map' -exec du -cb {} + | tail -1 | cut -f1)
-          echo "Bundle size: ${size} bytes"
-          if [ "$size" -gt 256000 ]; then
-            echo "::error::Bundle exceeded the 250 KB budget (${size} bytes)"
+          set -euo pipefail
+          bytes=$(cat dist/assets/*.js | wc -c)
+          gzipped=$(cat dist/assets/*.js | gzip -9 | wc -c)
+          budget=256000
+
+          {
+            echo "### Bundle size"
+            echo ""
+            echo "| Metric | Size | Budget |"
+            echo "| --- | ---: | ---: |"
+            echo "| Raw | $((bytes / 1024)) KB | $((budget / 1024)) KB |"
+            echo "| Gzipped | $((gzipped / 1024)) KB | — |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$bytes" -gt "$budget" ]; then
+            echo "::error::Bundle is ${bytes} bytes, over the ${budget} byte budget"
             exit 1
           fi
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7

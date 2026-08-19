@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Play the game
+    url: https://woohaharam.github.io/game/
+    about: Try to reproduce on the live build before filing — it is always the latest main.
+  - name: Architecture & design notes
+    url: https://github.com/woohaharam/game/blob/main/docs/ARCHITECTURE.md
+    about: Why the engine is built the way it is, and the trade-offs behind it.
