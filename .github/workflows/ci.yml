@@ -1,14 +1,17 @@
 name: CI
 
 on:
+  # Only `main` runs on push. Every other branch is covered by its pull
+  # request — triggering on both would run the whole matrix twice for each PR,
+  # burning minutes and putting two identical result sets on one commit.
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
-# One run per ref. Superseded runs are cancelled — a review only ever cares
-# about the result for the current head.
+# One run per pull request (or per branch, for pushes to main). Superseded runs
+# are cancelled: a review only ever cares about the current head.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
