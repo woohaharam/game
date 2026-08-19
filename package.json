@@ -2,20 +2,35 @@
   "name": "neon-depths",
   "version": "1.0.0",
   "private": true,
-  "description": "A hand-built 2D action roguelike running on a custom TypeScript game engine.",
+  "description": "A browser action roguelike built from scratch in TypeScript on a custom game engine.",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.2.0",
-    "typescript": "^7.0.2",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.0",
+    "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
     "vitest": "^4.1.11"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
   }
 }
