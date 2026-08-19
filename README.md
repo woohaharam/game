@@ -154,6 +154,10 @@ Merging to `main` re-runs the full verification gate and publishes to GitHub
 Pages. The deploy workflow does not trust CI's result on the merge commit — it
 is the thing that publishes, so it re-verifies before it does.
 
+Repository settings that cannot live in a commit — enabling Pages, and the
+branch-protection ruleset that makes the CI gates binding rather than advisory
+— are written down in [`docs/REPOSITORY_SETUP.md`](docs/REPOSITORY_SETUP.md).
+
 ## Contributing
 
 Issues and pull requests are welcome. Start with
