@@ -6,14 +6,7 @@ import type { AudioBus, SfxName } from '@engine/audio';
 import type { Camera } from '@engine/camera';
 import { TAU, angleDelta, circlesOverlap, clamp, type Vec2 } from '@engine/math';
 
-import {
-  ENEMY_BULLET,
-  FEEL,
-  PICKUP,
-  ROOM,
-  SCORE,
-  type EnemyKind,
-} from '@game/config';
+import { ENEMY_BULLET, FEEL, PICKUP, ROOM, SCORE, type EnemyKind } from '@game/config';
 import { generateDungeon } from '@game/dungeon/generator';
 import {
   TILE_SIZE,
@@ -25,7 +18,12 @@ import {
   type Room,
   type TileId,
 } from '@game/dungeon/types';
-import { hasLineOfSight, isSolidAt, resolveCircle, type CollisionResult } from '@game/collision';
+import {
+  hasLineOfSight,
+  isSolidAt,
+  resolveCircle,
+  type CollisionResult,
+} from '@game/collision';
 import { Enemy } from '@game/entities/enemy';
 import { Player } from '@game/entities/player';
 import type { CombatContext } from '@game/entities/context';
@@ -117,6 +115,8 @@ export class World implements CombatContext {
   readonly texts: Pool<FloatingText>;
 
   private readonly enemyHash = new SpatialHash<Enemy>(48);
+  /** Reused broadphase result buffer; never escapes the method that fills it. */
+  private readonly candidates: Enemy[] = [];
   private readonly collision: CollisionResult = { x: 0, y: 0, hitX: false, hitY: false };
 
   /** Index of the room the player is standing in. */
@@ -148,9 +148,28 @@ export class World implements CombatContext {
     this.particles = new ParticleSystem(this.cosmeticRng);
 
     this.projectiles = new Pool(createProjectile, resetProjectile, MAX_PROJECTILES);
-    this.enemyBullets = new Pool(createEnemyBullet, (b) => { b.life = 0; }, MAX_ENEMY_BULLETS);
-    this.pickups = new Pool(createPickup, (p) => { p.life = 0; p.delay = 0; }, MAX_PICKUPS);
-    this.texts = new Pool(createFloatingText, (t) => { t.life = 0; }, MAX_TEXTS);
+    this.enemyBullets = new Pool(
+      createEnemyBullet,
+      (b) => {
+        b.life = 0;
+      },
+      MAX_ENEMY_BULLETS,
+    );
+    this.pickups = new Pool(
+      createPickup,
+      (p) => {
+        p.life = 0;
+        p.delay = 0;
+      },
+      MAX_PICKUPS,
+    );
+    this.texts = new Pool(
+      createFloatingText,
+      (t) => {
+        t.life = 0;
+      },
+      MAX_TEXTS,
+    );
 
     for (let i = 0; i < MAX_ENEMIES; i++) this.enemies.push(new Enemy());
   }
@@ -215,7 +234,10 @@ export class World implements CombatContext {
     this.roomPhase = 'idle';
     this.roomTimer = 0;
 
-    const start = this.dungeon.rooms[this.dungeon.startRoom] as Room;
+    const start = this.dungeon.rooms[this.dungeon.startRoom];
+    // The generator guarantees a start room; if that ever stops holding, fail
+    // loudly here rather than dropping the player into undefined geometry.
+    if (start === undefined) throw new Error('Generated dungeon has no start room');
     const centre = roomCenter(start);
     this.player.reset(centre.x, centre.y, this.run.stats);
     start.visited = true;
@@ -329,9 +351,14 @@ export class World implements CombatContext {
     if (intent.dashPressed) player.requestDash();
     if (intent.firing) player.requestFire();
 
+    // Sampled either side of the update so the dash's start edge is detected
+    // once. Read into two separate consts: comparing a const against the live
+    // getter makes TypeScript treat the getter as an alias of the snapshot and
+    // narrow the check away.
     const wasDashing = player.isDashing;
     player.update(step, intent.move, this.run.stats);
-    if (!wasDashing && player.isDashing) this.onDashStarted();
+    const isDashing = player.isDashing;
+    if (!wasDashing && isDashing) this.onDashStarted();
 
     resolveCircle(
       this.dungeon,
@@ -350,9 +377,14 @@ export class World implements CombatContext {
 
     if (player.isDashing) {
       this.particles.emit(
-        player.x, player.y,
-        -player.vx * 0.12, -player.vy * 0.12,
-        '#6ef2ff', 0.25, 5, 'spark',
+        player.x,
+        player.y,
+        -player.vx * 0.12,
+        -player.vy * 0.12,
+        '#6ef2ff',
+        0.25,
+        5,
+        'spark',
       );
     }
 
@@ -508,10 +540,17 @@ export class World implements CombatContext {
 
   private resolveContactDamage(enemy: Enemy): void {
     if (enemy.contactDamage <= 0 || !this.player.alive) return;
-    if (!circlesOverlap(
-      enemy.x, enemy.y, enemy.radius,
-      this.player.x, this.player.y, this.player.radius,
-    )) return;
+    if (
+      !circlesOverlap(
+        enemy.x,
+        enemy.y,
+        enemy.radius,
+        this.player.x,
+        this.player.y,
+        this.player.radius,
+      )
+    )
+      return;
 
     this.damagePlayer(enemy.contactDamage);
 
@@ -546,13 +585,18 @@ export class World implements CombatContext {
       }
 
       let consumed = false;
-      this.enemyHash.query(bullet.x, bullet.y, bullet.radius + 24, (enemy) => {
-        if (consumed || !enemy.alive || enemy.spawnTimer > 0) return;
-        if (bullet.hits.has(enemy)) return;
-        if (!circlesOverlap(
-          bullet.x, bullet.y, bullet.radius,
-          enemy.x, enemy.y, enemy.radius,
-        )) return;
+      const candidates = this.enemyHash.collectInto(
+        this.candidates,
+        bullet.x,
+        bullet.y,
+        bullet.radius + 24,
+      );
+
+      for (const enemy of candidates) {
+        if (!enemy.alive || enemy.spawnTimer > 0) continue;
+        if (bullet.hits.has(enemy)) continue;
+        if (!circlesOverlap(bullet.x, bullet.y, bullet.radius, enemy.x, enemy.y, enemy.radius))
+          continue;
 
         const angle = Math.atan2(bullet.vy, bullet.vx);
         this.damageEnemy(enemy, bullet.damage, {
@@ -563,11 +607,18 @@ export class World implements CombatContext {
         bullet.hits.add(enemy);
 
         if (bullet.explosionRadius > 0) {
-          this.explode(bullet.x, bullet.y, bullet.explosionRadius, bullet.damage * 0.6, '#ffb03a', {
-            hurtsPlayer: false,
-          });
+          this.explode(
+            bullet.x,
+            bullet.y,
+            bullet.explosionRadius,
+            bullet.damage * 0.6,
+            '#ffb03a',
+            {
+              hurtsPlayer: false,
+            },
+          );
           consumed = true;
-          return;
+          break;
         }
         if (bullet.pierce > 0) {
           bullet.pierce--;
@@ -576,8 +627,9 @@ export class World implements CombatContext {
           bullet.damage = Math.max(1, Math.round(bullet.damage * 0.8));
         } else {
           consumed = true;
+          break;
         }
-      });
+      }
 
       if (consumed) this.projectiles.release(index);
     });
@@ -585,28 +637,32 @@ export class World implements CombatContext {
 
   /** Gentle steering toward the nearest enemy inside a forward-facing cone. */
   private steerProjectile(bullet: Projectile, step: number): void {
-    let best: Enemy | null = null;
+    let target: Enemy | undefined;
     let bestScore = Number.POSITIVE_INFINITY;
     const heading = Math.atan2(bullet.vy, bullet.vx);
 
-    this.enemyHash.query(bullet.x, bullet.y, 220, (enemy) => {
-      if (!enemy.alive || enemy.spawnTimer > 0 || bullet.hits.has(enemy)) return;
+    const candidates = this.enemyHash.collectInto(this.candidates, bullet.x, bullet.y, 220);
+    for (const enemy of candidates) {
+      if (!enemy.alive || enemy.spawnTimer > 0 || bullet.hits.has(enemy)) continue;
       const dx = enemy.x - bullet.x;
       const dy = enemy.y - bullet.y;
       const offset = Math.abs(angleDelta(heading, Math.atan2(dy, dx)));
       // Never turn back on itself: a bullet that boomerangs reads as a bug.
-      if (offset > 1.1) return;
+      if (offset > 1.1) continue;
       const score = Math.hypot(dx, dy) + offset * 120;
       if (score < bestScore) {
         bestScore = score;
-        best = enemy;
+        target = enemy;
       }
-    });
+    }
 
-    if (best === null) return;
-    const target = best as Enemy;
+    if (target === undefined) return;
     const desired = Math.atan2(target.y - bullet.y, target.x - bullet.x);
-    const turn = clamp(angleDelta(heading, desired), -bullet.homing * step, bullet.homing * step);
+    const turn = clamp(
+      angleDelta(heading, desired),
+      -bullet.homing * step,
+      bullet.homing * step,
+    );
     const speed = Math.hypot(bullet.vx, bullet.vy);
     const angle = heading + turn;
     bullet.vx = Math.cos(angle) * speed;
@@ -656,8 +712,12 @@ export class World implements CombatContext {
       if (
         this.player.alive &&
         circlesOverlap(
-          bullet.x, bullet.y, bullet.radius,
-          this.player.x, this.player.y, this.player.radius,
+          bullet.x,
+          bullet.y,
+          bullet.radius,
+          this.player.x,
+          this.player.y,
+          this.player.radius,
         )
       ) {
         // Dashing through a bullet destroys it even while invulnerable, so a
@@ -698,10 +758,7 @@ export class World implements CombatContext {
       pickup.vx *= friction;
       pickup.vy *= friction;
 
-      if (
-        this.player.alive &&
-        distance < this.player.radius + PICKUP.radius
-      ) {
+      if (this.player.alive && distance < this.player.radius + PICKUP.radius) {
         this.collectPickup(pickup.kind);
         this.pickups.release(index);
       }
@@ -731,10 +788,15 @@ export class World implements CombatContext {
       if (pedestal.taken || !this.player.alive) continue;
       if (
         !circlesOverlap(
-          pedestal.x, pedestal.y, 18,
-          this.player.x, this.player.y, this.player.radius,
+          pedestal.x,
+          pedestal.y,
+          18,
+          this.player.x,
+          this.player.y,
+          this.player.radius,
         )
-      ) continue;
+      )
+        continue;
 
       if (pedestal.kind === 'shop') {
         if (this.run.coins < pedestal.price) continue;
@@ -752,8 +814,10 @@ export class World implements CombatContext {
     // Max-health changes adjust current health so a +health pickup actually
     // heals and Glass Cannon's downside is felt immediately.
     const delta = this.run.stats.maxHealth - previousMax;
-    if (delta > 0) this.player.health = Math.min(this.run.stats.maxHealth, this.player.health + delta);
-    else if (delta < 0) this.player.health = Math.max(1, Math.min(this.player.health, this.run.stats.maxHealth));
+    if (delta > 0)
+      this.player.health = Math.min(this.run.stats.maxHealth, this.player.health + delta);
+    else if (delta < 0)
+      this.player.health = Math.max(1, Math.min(this.player.health, this.run.stats.maxHealth));
 
     this.playSfx('upgrade');
     this.camera.addTrauma(0.2);
@@ -883,11 +947,7 @@ export class World implements CombatContext {
     this.pendingSpawns.forEach((kind, i) => {
       const point = points[i % points.length];
       if (point === undefined) return;
-      this.spawnEnemy(
-        kind,
-        (point.x + 0.5) * TILE_SIZE,
-        (point.y + 0.5) * TILE_SIZE,
-      );
+      this.spawnEnemy(kind, (point.x + 0.5) * TILE_SIZE, (point.y + 0.5) * TILE_SIZE);
     });
   }
 
