@@ -34,9 +34,18 @@ interface Particle {
 
 function createParticle(): Particle {
   return {
-    x: 0, y: 0, vx: 0, vy: 0,
-    life: 0, maxLife: 1, size: 2, drag: 1,
-    color: '#fff', shape: 'dot', px: 0, py: 0,
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    life: 0,
+    maxLife: 1,
+    size: 2,
+    drag: 1,
+    color: '#fff',
+    shape: 'dot',
+    px: 0,
+    py: 0,
   };
 }
 
@@ -60,10 +69,14 @@ export class ParticleSystem {
     private readonly rng: Rng,
     capacity = 2000,
   ) {
-    this.pool = new Pool<Particle>(createParticle, (p) => {
-      p.life = 0;
-      p.drag = 1;
-    }, capacity);
+    this.pool = new Pool<Particle>(
+      createParticle,
+      (p) => {
+        p.life = 0;
+        p.drag = 1;
+      },
+      capacity,
+    );
   }
 
   get liveCount(): number {

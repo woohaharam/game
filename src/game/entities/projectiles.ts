@@ -29,9 +29,21 @@ export interface Projectile {
 
 export function createProjectile(): Projectile {
   return {
-    x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
-    radius: 4, damage: 1, critical: false, life: 0,
-    pierce: 0, hits: new Set(), explosionRadius: 0, homing: 0, knockback: 0,
+    x: 0,
+    y: 0,
+    px: 0,
+    py: 0,
+    vx: 0,
+    vy: 0,
+    radius: 4,
+    damage: 1,
+    critical: false,
+    life: 0,
+    pierce: 0,
+    hits: new Set(),
+    explosionRadius: 0,
+    homing: 0,
+    knockback: 0,
   };
 }
 
@@ -59,8 +71,16 @@ export interface EnemyBullet {
 
 export function createEnemyBullet(): EnemyBullet {
   return {
-    x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
-    radius: 6, damage: 1, life: 0, color: '#ff7a4d',
+    x: 0,
+    y: 0,
+    px: 0,
+    py: 0,
+    vx: 0,
+    vy: 0,
+    radius: 6,
+    damage: 1,
+    life: 0,
+    color: '#ff7a4d',
   };
 }
 
@@ -81,8 +101,15 @@ export interface Pickup {
 
 export function createPickup(): Pickup {
   return {
-    x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
-    kind: 'coin', life: 0, delay: 0,
+    x: 0,
+    y: 0,
+    px: 0,
+    py: 0,
+    vx: 0,
+    vy: 0,
+    kind: 'coin',
+    life: 0,
+    delay: 0,
   };
 }
 

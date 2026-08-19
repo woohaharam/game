@@ -35,7 +35,10 @@ export function isSolidAt(
   const tx = Math.floor(worldX / TILE_SIZE);
   const ty = Math.floor(worldY / TILE_SIZE);
   if (tx < 0 || ty < 0 || tx >= dungeon.width || ty >= dungeon.height) return true;
-  return isSolidTile((dungeon.tiles[ty * dungeon.width + tx] ?? Tile.Void) as TileId, doorsLocked);
+  return isSolidTile(
+    (dungeon.tiles[ty * dungeon.width + tx] ?? Tile.Void) as TileId,
+    doorsLocked,
+  );
 }
 
 /**

@@ -46,14 +46,19 @@ export class Minimap {
     ctx.save();
     ctx.globalAlpha = 0.9;
     renderer.rect(
-      originX - padding, originY - padding,
-      width + padding * 2, height + padding * 2,
+      originX - padding,
+      originY - padding,
+      width + padding * 2,
+      height + padding * 2,
       UI.panel,
     );
     renderer.strokeRect(
-      originX - padding, originY - padding,
-      width + padding * 2, height + padding * 2,
-      UI.panelBorder, 1,
+      originX - padding,
+      originY - padding,
+      width + padding * 2,
+      height + padding * 2,
+      UI.panelBorder,
+      1,
     );
 
     // Revealed = visited, or adjacent to something visited.
@@ -77,9 +82,12 @@ export class Minimap {
         const ox = originX + (other.cellX - minX) * (CELL + GAP);
         const oy = originY + (other.cellY - minY) * (CELL + GAP);
         renderer.line(
-          x + CELL / 2, y + CELL / 2,
-          ox + CELL / 2, oy + CELL / 2,
-          'rgba(120, 160, 200, 0.28)', 2,
+          x + CELL / 2,
+          y + CELL / 2,
+          ox + CELL / 2,
+          oy + CELL / 2,
+          'rgba(120, 160, 200, 0.28)',
+          2,
         );
       }
 
@@ -90,7 +98,14 @@ export class Minimap {
       }
 
       renderer.rect(x, y, CELL, CELL, room.cleared ? '#1d2c42' : '#3a2030');
-      renderer.strokeRect(x, y, CELL, CELL, isCurrent ? palette.accent : 'rgba(150,180,220,0.4)', isCurrent ? 2 : 1);
+      renderer.strokeRect(
+        x,
+        y,
+        CELL,
+        CELL,
+        isCurrent ? palette.accent : 'rgba(150,180,220,0.4)',
+        isCurrent ? 2 : 1,
+      );
 
       const mark = ROOM_MARKS[room.type];
       if (mark !== undefined) {

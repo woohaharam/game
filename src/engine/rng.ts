@@ -13,7 +13,7 @@ export class Rng {
 
   constructor(seed: number) {
     // Force to an unsigned 32-bit integer; 0 is a degenerate state for mulberry32.
-    this.state = (seed >>> 0) || 0x9e3779b9;
+    this.state = seed >>> 0 || 0x9e3779b9;
   }
 
   /** Hashes an arbitrary string into a seed, so "cavern" is a valid seed. */

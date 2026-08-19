@@ -37,7 +37,11 @@ export class Hud {
       // Discrete pips rather than a bar: at these amounts the player needs to
       // know "how many hits left", not a percentage.
       renderer.polygon(
-        x, y, size / 2, 4, 0,
+        x,
+        y,
+        size / 2,
+        4,
+        0,
         filled ? UI.health : UI.healthEmpty,
         true,
         filled ? 12 : 0,
@@ -46,7 +50,11 @@ export class Hud {
 
     const armor = world.run.stats.armor;
     if (armor > 0) {
-      renderer.text(`ARMOR ${armor}`, 24, 52, { size: 11, color: UI.textDim, letterSpacing: '1px' });
+      renderer.text(`ARMOR ${armor}`, 24, 52, {
+        size: 11,
+        color: UI.textDim,
+        letterSpacing: '1px',
+      });
     }
   }
 
@@ -103,9 +111,13 @@ export class Hud {
 
     const screen = renderer.worldToScreen(player.x, player.y);
     renderer.arc(
-      screen.x, screen.y, 22,
-      -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready,
-      'rgba(110, 242, 255, 0.85)', 3,
+      screen.x,
+      screen.y,
+      22,
+      -Math.PI / 2,
+      -Math.PI / 2 + Math.PI * 2 * ready,
+      'rgba(110, 242, 255, 0.85)',
+      3,
     );
   }
 

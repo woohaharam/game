@@ -21,7 +21,7 @@ export class GameOverScene implements Scene {
   readonly name = 'game-over';
 
   private time = 0;
-  private readonly summary: Array<[string, string]>;
+  private readonly summary: [string, string][];
   private readonly newBest: boolean;
 
   constructor(
@@ -56,7 +56,11 @@ export class GameOverScene implements Scene {
       return;
     }
 
-    if (input.wasPressed('restart') || input.wasPressed('confirm') || input.wasPressed('fire')) {
+    if (
+      input.wasPressed('restart') ||
+      input.wasPressed('confirm') ||
+      input.wasPressed('fire')
+    ) {
       audio.play('uiSelect');
       stack.replaceAll(new GameScene(this.seed));
       return;
@@ -151,11 +155,16 @@ export class GameOverScene implements Scene {
       align: 'center',
       letterSpacing: '2px',
     });
-    renderer.text('R / CLICK — retry this seed      ESC — main menu', width / 2, height * 0.94, {
-      size: 13,
-      color: UI.combo,
-      align: 'center',
-    });
+    renderer.text(
+      'R / CLICK — retry this seed      ESC — main menu',
+      width / 2,
+      height * 0.94,
+      {
+        size: 13,
+        color: UI.combo,
+        align: 'center',
+      },
+    );
 
     renderer.ctx.globalAlpha = 1;
   }

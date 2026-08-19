@@ -12,15 +12,7 @@ import { clamp, type Vec2 } from './math';
  * simulation tick, so a key tapped between two ticks is never swallowed.
  */
 export type Action =
-  | 'up'
-  | 'down'
-  | 'left'
-  | 'right'
-  | 'dash'
-  | 'fire'
-  | 'pause'
-  | 'confirm'
-  | 'restart';
+  'up' | 'down' | 'left' | 'right' | 'dash' | 'fire' | 'pause' | 'confirm' | 'restart';
 
 const DEFAULT_BINDINGS: Record<string, Action> = {
   KeyW: 'up',
@@ -55,7 +47,7 @@ export class Input {
   /** Analog move vector from a virtual stick; overrides keys when non-zero. */
   private readonly stick: Vec2 = { x: 0, y: 0 };
 
-  private readonly listeners: Array<() => void> = [];
+  private readonly listeners: (() => void)[] = [];
 
   constructor(
     private readonly target: HTMLCanvasElement,

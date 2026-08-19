@@ -110,7 +110,7 @@ which is what lets the player slide along a wall instead of catching on it. Two
 relaxation passes run because resolving one tile can push the entity into
 another at an inside corner.
 
-Doors are handled *inside the collision query* via a `doorsLocked` flag rather
+Doors are handled _inside the collision query_ via a `doorsLocked` flag rather
 than as separate wall entities. Combat lockdown then costs one boolean instead
 of a set of spawned and despawned colliders.
 
@@ -122,7 +122,7 @@ rather than an allocated `"x,y"` string, and the grid is rebuilt from scratch
 each frame — everything moves anyway, so clearing reusable buckets beats
 maintaining them incrementally.
 
-The hash is a *broadphase*: it may over-report, never under-report. The test
+The hash is a _broadphase_: it may over-report, never under-report. The test
 suite asserts exactly that property against brute force on random data.
 
 ## 6. Object pooling
@@ -218,7 +218,7 @@ the import cycle between the world and its entities.
 
 `src/engine/input.ts`
 
-Gameplay code never reads key codes. It asks whether an *action* is held or was
+Gameplay code never reads key codes. It asks whether an _action_ is held or was
 pressed this tick. That indirection is what lets keyboard, mouse and touch drive
 the same code path, and makes rebinding a data change.
 
@@ -227,7 +227,7 @@ simulation tick, so a key tapped between two ticks is never swallowed.
 
 Originally each scene cleared the edges at the end of its own update. That
 produced a genuine bug: pressing `Esc` in the pause menu popped the scene
-*without* clearing the edge, so the game scene underneath saw the same press on
+_without_ clearing the edge, so the game scene underneath saw the same press on
 the next tick and immediately re-opened the menu. Edge clearing now happens once
 per tick in the loop, after the whole scene stack has run — a class of bug
 removed rather than an instance fixed.

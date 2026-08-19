@@ -90,7 +90,10 @@ export class RewardScene implements Scene {
 
       renderer.rect(x, y, layout.cardWidth, layout.cardHeight, UI.panel);
       renderer.strokeRect(
-        x, y, layout.cardWidth, layout.cardHeight,
+        x,
+        y,
+        layout.cardWidth,
+        layout.cardHeight,
         selected ? accent : 'rgba(120, 150, 190, 0.28)',
         selected ? 2 : 1,
       );
@@ -104,8 +107,14 @@ export class RewardScene implements Scene {
 
       const centreX = x + layout.cardWidth / 2;
       renderer.polygon(
-        centreX, y + 62, selected ? 26 : 23, 6,
-        this.time * (selected ? 1.4 : 0.5), accent, false, selected ? 16 : 6,
+        centreX,
+        y + 62,
+        selected ? 26 : 23,
+        6,
+        this.time * (selected ? 1.4 : 0.5),
+        accent,
+        false,
+        selected ? 16 : 6,
       );
       renderer.polygon(centreX, y + 62, 11, 6, -this.time * 0.8, accent, true, 10);
 
@@ -126,12 +135,17 @@ export class RewardScene implements Scene {
       renderer.ctx.globalAlpha = 1;
     });
 
-    renderer.text('◄ ► or hover to choose   ·   ENTER / CLICK to take', width / 2, height * 0.86, {
-      size: 12,
-      color: UI.textDim,
-      align: 'center',
-      letterSpacing: '1px',
-    });
+    renderer.text(
+      '◄ ► or hover to choose   ·   ENTER / CLICK to take',
+      width / 2,
+      height * 0.86,
+      {
+        size: 12,
+        color: UI.textDim,
+        align: 'center',
+        letterSpacing: '1px',
+      },
+    );
   }
 
   private cardIndexAt(width: number, height: number, x: number, y: number): number {
@@ -139,8 +153,10 @@ export class RewardScene implements Scene {
     for (let i = 0; i < this.choices.length; i++) {
       const cardX = layout.startX + i * (layout.cardWidth + layout.gap);
       if (
-        x >= cardX && x <= cardX + layout.cardWidth &&
-        y >= layout.y && y <= layout.y + layout.cardHeight
+        x >= cardX &&
+        x <= cardX + layout.cardWidth &&
+        y >= layout.y &&
+        y <= layout.y + layout.cardHeight
       ) {
         return i;
       }

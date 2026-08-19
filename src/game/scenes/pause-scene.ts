@@ -63,7 +63,7 @@ export class PauseScene implements Scene {
       glow: 18,
     });
 
-    const rows: Array<[string, string]> = [
+    const rows: [string, string][] = [
       ['ESC / P', 'resume'],
       ['R', 'abandon run'],
     ];
@@ -75,14 +75,16 @@ export class PauseScene implements Scene {
       });
     });
 
-    renderer.text(
-      `SOUND: ${audio.muted ? 'OFF' : 'ON'}`,
-      width / 2, height * 0.6,
-      { size: 15, color: UI.combo, align: 'center', letterSpacing: '2px' },
-    );
+    renderer.text(`SOUND: ${audio.muted ? 'OFF' : 'ON'}`, width / 2, height * 0.6, {
+      size: 15,
+      color: UI.combo,
+      align: 'center',
+      letterSpacing: '2px',
+    });
     renderer.text(
       `EFFECTS: ${renderer.lowQuality ? 'LOW' : 'HIGH'}`,
-      width / 2, height * 0.66,
+      width / 2,
+      height * 0.66,
       { size: 15, color: UI.combo, align: 'center', letterSpacing: '2px' },
     );
     renderer.text('click to toggle', width / 2, height * 0.72, {
