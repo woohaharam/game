@@ -218,7 +218,16 @@ export class WorldRenderer {
         const t = 1 - enemy.spawnTimer / ROOM.spawnTelegraph;
         renderer.ring(x, y, enemy.radius + 26 * (1 - t), enemy.color, 2, 12);
         ctx.globalAlpha = t * 0.6;
-        renderer.polygon(x, y, enemy.radius * t, sidesFor(enemy), enemy.spin, enemy.color, true, 8);
+        renderer.polygon(
+          x,
+          y,
+          enemy.radius * t,
+          sidesFor(enemy),
+          enemy.spin,
+          enemy.color,
+          true,
+          8,
+        );
         ctx.globalAlpha = 1;
         continue;
       }
@@ -234,9 +243,13 @@ export class WorldRenderer {
       if (!enemy.isBoss && enemy.maxHealth > 40 && enemy.health < enemy.maxHealth) {
         const ratio = Math.max(0, enemy.health / enemy.maxHealth);
         renderer.arc(
-          x, y, enemy.radius + 7,
-          -Math.PI / 2, -Math.PI / 2 + TAU * ratio,
-          '#ff8fa3', 3,
+          x,
+          y,
+          enemy.radius + 7,
+          -Math.PI / 2,
+          -Math.PI / 2 + TAU * ratio,
+          '#ff8fa3',
+          3,
         );
       }
     }
@@ -295,7 +308,8 @@ export class WorldRenderer {
     }
     if (length <= 0) return;
     renderer.line(
-      x, y,
+      x,
+      y,
       x + Math.cos(angle) * length,
       y + Math.sin(angle) * length,
       color,
@@ -366,15 +380,22 @@ export class WorldRenderer {
   private drawPedestals(renderer: Renderer, world: World): void {
     for (const pedestal of world.pedestals) {
       const bob = Math.sin(pedestal.phase) * 3;
-      const color = pedestal.taken
-        ? '#2c3a4d'
-        : UI.rarity[pedestal.upgrade.rarity];
+      const color = pedestal.taken ? '#2c3a4d' : UI.rarity[pedestal.upgrade.rarity];
 
       renderer.rect(pedestal.x - 14, pedestal.y + 8, 28, 10, '#1a2436');
       renderer.ring(pedestal.x, pedestal.y + 13, 18, color, 2, pedestal.taken ? 0 : 10);
       if (pedestal.taken) continue;
 
-      renderer.polygon(pedestal.x, pedestal.y - 6 + bob, 11, 6, pedestal.phase * 0.6, color, true, 18);
+      renderer.polygon(
+        pedestal.x,
+        pedestal.y - 6 + bob,
+        11,
+        6,
+        pedestal.phase * 0.6,
+        color,
+        true,
+        18,
+      );
 
       renderer.text(pedestal.upgrade.name, pedestal.x, pedestal.y - 34 + bob, {
         size: 13,
@@ -438,11 +459,18 @@ export class WorldRenderer {
     const danger = healthRatio <= 0.34 ? 1 - healthRatio / 0.34 : 0;
 
     const gradient = ctx.createRadialGradient(
-      width / 2, height / 2, height * 0.32,
-      width / 2, height / 2, height * 0.85,
+      width / 2,
+      height / 2,
+      height * 0.32,
+      width / 2,
+      height / 2,
+      height * 0.85,
     );
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, `rgba(${danger > 0 ? 60 : 0}, 0, ${danger > 0 ? 20 : 0}, ${0.55 + danger * 0.25})`);
+    gradient.addColorStop(
+      1,
+      `rgba(${danger > 0 ? 60 : 0}, 0, ${danger > 0 ? 20 : 0}, ${0.55 + danger * 0.25})`,
+    );
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 

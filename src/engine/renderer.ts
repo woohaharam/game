@@ -131,14 +131,7 @@ export class Renderer {
     if (glowBlur > 0) this.clearGlow();
   }
 
-  ring(
-    x: number,
-    y: number,
-    radius: number,
-    color: string,
-    lineWidth = 2,
-    glowBlur = 0,
-  ): void {
+  ring(x: number, y: number, radius: number, color: string, lineWidth = 2, glowBlur = 0): void {
     const { ctx } = this;
     if (glowBlur > 0) this.glow(color, glowBlur);
     ctx.strokeStyle = color;
@@ -172,14 +165,7 @@ export class Renderer {
     this.ctx.fillRect(x, y, w, h);
   }
 
-  strokeRect(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    color: string,
-    lineWidth = 2,
-  ): void {
+  strokeRect(x: number, y: number, w: number, h: number, color: string, lineWidth = 2): void {
     this.ctx.strokeStyle = color;
     this.ctx.lineWidth = lineWidth;
     this.ctx.strokeRect(x, y, w, h);

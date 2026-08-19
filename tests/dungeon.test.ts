@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon, roomCountForDepth } from '@game/dungeon/generator';
-import {
-  Tile,
-  isWalkable,
-  type Dungeon,
-  type TileId,
-} from '@game/dungeon/types';
+import { Tile, isWalkable, type Dungeon, type TileId } from '@game/dungeon/types';
 
 /**
  * The generator is the one system where a bad roll is unrecoverable: a boss
@@ -24,11 +19,11 @@ function reachableTiles(dungeon: Dungeon): number {
 
   const seen = new Uint8Array(dungeon.width * dungeon.height);
   const stack = [sy * dungeon.width + sx];
-  seen[stack[0] as number] = 1;
+  seen[stack[0]!] = 1;
   let count = 0;
 
   while (stack.length > 0) {
-    const index = stack.pop() as number;
+    const index = stack.pop()!;
     count++;
     const x = index % dungeon.width;
     const y = Math.floor(index / dungeon.width);

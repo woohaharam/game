@@ -63,8 +63,10 @@ export class MenuScene implements Scene {
     if (this.rng.chance(0.6)) {
       const x = this.rng.float(0, renderer.width);
       this.particles.emit(
-        x, renderer.height + 10,
-        this.rng.float(-14, 14), this.rng.float(-40, -14),
+        x,
+        renderer.height + 10,
+        this.rng.float(-14, 14),
+        this.rng.float(-40, -14),
         this.rng.chance(0.15) ? '#ff5c7a' : '#2b6f96',
         this.rng.float(2.5, 5.5),
         this.rng.float(1, 3),
@@ -100,7 +102,7 @@ export class MenuScene implements Scene {
     // means "surprise me".
     const seed =
       trimmed.length === 0
-        ? (Math.floor(Math.random() * 0xffffffff) >>> 0)
+        ? Math.floor(Math.random() * 0xffffffff) >>> 0
         : /^\d+$/.test(trimmed)
           ? Number(trimmed) >>> 0
           : Rng.fromString(trimmed).seed;
@@ -127,7 +129,16 @@ export class MenuScene implements Scene {
       renderer.ring(width / 2, height * 0.3 + bob, radius, '#4cc9ff', 2, 20);
       renderer.ctx.restore();
     }
-    renderer.polygon(width / 2, height * 0.3 + bob, 26, 3, this.time * 0.7, '#6ef2ff', true, 26);
+    renderer.polygon(
+      width / 2,
+      height * 0.3 + bob,
+      26,
+      3,
+      this.time * 0.7,
+      '#6ef2ff',
+      true,
+      26,
+    );
 
     renderer.text('NEON DEPTHS', width / 2, height * 0.45 + bob, {
       size: 58,
@@ -161,14 +172,22 @@ export class MenuScene implements Scene {
     const boxY = height * 0.66 - 16;
     renderer.rect(boxX, boxY, boxWidth, 32, 'rgba(10, 16, 28, 0.9)');
     renderer.strokeRect(
-      boxX, boxY, boxWidth, 32,
+      boxX,
+      boxY,
+      boxWidth,
+      32,
       this.editingSeed ? UI.combo : 'rgba(120, 150, 190, 0.3)',
       this.editingSeed ? 2 : 1,
     );
     const caret = this.editingSeed && Math.floor(this.time * 2) % 2 === 0 ? '|' : '';
     renderer.text(
-      this.seedText.length > 0 ? this.seedText + caret : this.editingSeed ? caret : 'seed (optional)',
-      width / 2, boxY + 21,
+      this.seedText.length > 0
+        ? this.seedText + caret
+        : this.editingSeed
+          ? caret
+          : 'seed (optional)',
+      width / 2,
+      boxY + 21,
       {
         size: 13,
         color: this.seedText.length > 0 ? UI.text : UI.textDim,
@@ -180,7 +199,8 @@ export class MenuScene implements Scene {
     const profile = profileStore.value;
     renderer.text(
       `BEST ${profile.bestScore.toLocaleString()}   ·   DEEPEST FLOOR ${profile.bestDepth}   ·   ${profile.runs} RUNS`,
-      width / 2, height * 0.78,
+      width / 2,
+      height * 0.78,
       { size: 12, color: UI.textDim, align: 'center', letterSpacing: '2px' },
     );
 

@@ -207,7 +207,7 @@ interface EnemyContext {
 // ---------------------------------------------------------------------------
 
 /** Wanders when the player is far, closes in and swarms when near. */
-const gruntStates: Array<State<EnemyContext>> = [
+const gruntStates: State<EnemyContext>[] = [
   {
     name: 'chase',
     update({ enemy, world }, step) {
@@ -231,7 +231,7 @@ const gruntStates: Array<State<EnemyContext>> = [
  * closes when the player runs — then telegraphs before each burst.
  */
 const SHOOTER_RANGE = 240;
-const shooterStates: Array<State<EnemyContext>> = [
+const shooterStates: State<EnemyContext>[] = [
   {
     name: 'reposition',
     enter({ enemy }) {
@@ -300,7 +300,7 @@ const shooterStates: Array<State<EnemyContext>> = [
 ];
 
 /** Suicide charger: rushes, then fuses loudly before detonating. */
-const bomberStates: Array<State<EnemyContext>> = [
+const bomberStates: State<EnemyContext>[] = [
   {
     name: 'approach',
     update({ enemy, world }, step) {
@@ -328,7 +328,7 @@ const bomberStates: Array<State<EnemyContext>> = [
 ];
 
 /** Static emplacement that alternates aimed bursts with spiral sweeps. */
-const turretStates: Array<State<EnemyContext>> = [
+const turretStates: State<EnemyContext>[] = [
   {
     name: 'charge',
     enter({ enemy }) {
@@ -364,7 +364,7 @@ const turretStates: Array<State<EnemyContext>> = [
 ];
 
 /** Elite bruiser: slow pursuit punctuated by a committed, dodgeable charge. */
-const bruteStates: Array<State<EnemyContext>> = [
+const bruteStates: State<EnemyContext>[] = [
   {
     name: 'stalk',
     enter({ enemy }) {
@@ -401,9 +401,14 @@ const bruteStates: Array<State<EnemyContext>> = [
     },
     update({ enemy, world }, step) {
       world.particles.emit(
-        enemy.x, enemy.y,
-        -enemy.vx * 0.2, -enemy.vy * 0.2,
-        enemy.color, 0.3, 5, 'spark',
+        enemy.x,
+        enemy.y,
+        -enemy.vx * 0.2,
+        -enemy.vy * 0.2,
+        enemy.color,
+        0.3,
+        5,
+        'spark',
       );
       return enemy.tickTimer(step) ? 'recover' : null;
     },
@@ -430,7 +435,7 @@ const bruteStates: Array<State<EnemyContext>> = [
  * are far and sprays when you are close, which stops "hug the boss" and "run
  * away forever" from both being free wins.
  */
-const bossStates: Array<State<EnemyContext>> = [
+const bossStates: State<EnemyContext>[] = [
   {
     name: 'idle',
     enter({ enemy }) {
@@ -564,9 +569,14 @@ const bossStates: Array<State<EnemyContext>> = [
         world.addTrauma(0.25);
       }
       world.particles.emit(
-        enemy.x, enemy.y,
-        -enemy.vx * 0.15, -enemy.vy * 0.15,
-        enemy.color, 0.35, 8, 'spark',
+        enemy.x,
+        enemy.y,
+        -enemy.vx * 0.15,
+        -enemy.vy * 0.15,
+        enemy.color,
+        0.35,
+        8,
+        'spark',
       );
       return timeInState > 1.25 ? 'idle' : null;
     },
@@ -596,7 +606,7 @@ const bossStates: Array<State<EnemyContext>> = [
   },
 ];
 
-const MACHINES: Record<EnemyKind, { states: Array<State<EnemyContext>>; initial: string }> = {
+const MACHINES: Record<EnemyKind, { states: State<EnemyContext>[]; initial: string }> = {
   grunt: { states: gruntStates, initial: 'chase' },
   shooter: { states: shooterStates, initial: 'reposition' },
   bomber: { states: bomberStates, initial: 'approach' },

@@ -59,7 +59,7 @@ export interface Room {
   /** Whether the player has ever entered — drives minimap reveal. */
   visited: boolean;
   /** Pre-validated spawn positions in tile coordinates. */
-  spawnPoints: Array<{ x: number; y: number }>;
+  spawnPoints: { x: number; y: number }[];
 }
 
 export interface Dungeon {

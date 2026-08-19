@@ -23,7 +23,7 @@ export class StateMachine<C> {
   private active: State<C> | null = null;
   private elapsed = 0;
 
-  constructor(states: ReadonlyArray<State<C>>, initial: string) {
+  constructor(states: readonly State<C>[], initial: string) {
     for (const state of states) this.states.set(state.name, state);
     const first = this.states.get(initial);
     if (first === undefined) throw new Error(`Unknown initial state: ${initial}`);

@@ -30,8 +30,22 @@ const STICK_RADIUS = 62;
 const DEAD_ZONE = 0.14;
 
 export class TouchControls {
-  private readonly moveStick: Stick = { id: -1, originX: 0, originY: 0, x: 0, y: 0, active: false };
-  private readonly aimStick: Stick = { id: -1, originX: 0, originY: 0, x: 0, y: 0, active: false };
+  private readonly moveStick: Stick = {
+    id: -1,
+    originX: 0,
+    originY: 0,
+    x: 0,
+    y: 0,
+    active: false,
+  };
+  private readonly aimStick: Stick = {
+    id: -1,
+    originX: 0,
+    originY: 0,
+    x: 0,
+    y: 0,
+    active: false,
+  };
 
   /** Pointer id currently held down on the dash button, or -1. */
   private dashPointer = -1;
@@ -45,7 +59,7 @@ export class TouchControls {
 
   private readonly aimPoint: Vec2 = vec2();
   private readonly scratch: Vec2 = vec2();
-  private readonly listeners: Array<() => void> = [];
+  private readonly listeners: (() => void)[] = [];
 
   attach(input: Input, renderer: Renderer): void {
     this.renderer = renderer;

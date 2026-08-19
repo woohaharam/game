@@ -170,7 +170,9 @@ describe('World (headless)', () => {
     const dt = 1 / 60;
     for (let i = 0; i < 60 * 20; i++) {
       world.update(dt, botIntent(world));
-      expect(isSolidAt(world.dungeon, world.player.x, world.player.y, world.doorsLocked)).toBe(false);
+      expect(isSolidAt(world.dungeon, world.player.x, world.player.y, world.doorsLocked)).toBe(
+        false,
+      );
       for (const enemy of world.enemies) {
         if (!enemy.alive || enemy.spawnTimer > 0) continue;
         expect(Number.isFinite(enemy.x)).toBe(true);

@@ -2,11 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { Pool } from '@engine/pool';
 import { SpatialHash } from '@engine/spatial-hash';
 import { StateMachine, type State } from '@engine/fsm';
-import { angleDelta, clamp, clampLength, damp, explosionSafe, lerp, normalize } from './helpers';
+import {
+  angleDelta,
+  clamp,
+  clampLength,
+  damp,
+  explosionSafe,
+  lerp,
+  normalize,
+} from './helpers';
 
 describe('Pool', () => {
   it('hands out distinct instances until exhausted, then returns null', () => {
-    const pool = new Pool(() => ({ value: 0 }), (item) => { item.value = 0; }, 3);
+    const pool = new Pool(
+      () => ({ value: 0 }),
+      (item) => {
+        item.value = 0;
+      },
+      3,
+    );
     const acquired = [pool.acquire(), pool.acquire(), pool.acquire()];
     expect(acquired.every((a) => a !== null)).toBe(true);
     expect(new Set(acquired.map((a) => a?.index)).size).toBe(3);
@@ -16,7 +30,13 @@ describe('Pool', () => {
   });
 
   it('recycles released slots and resets their state', () => {
-    const pool = new Pool(() => ({ value: 0 }), (item) => { item.value = 0; }, 2);
+    const pool = new Pool(
+      () => ({ value: 0 }),
+      (item) => {
+        item.value = 0;
+      },
+      2,
+    );
     const first = pool.acquire();
     expect(first).not.toBeNull();
     first!.item.value = 42;
@@ -29,7 +49,11 @@ describe('Pool', () => {
   });
 
   it('ignores a double release', () => {
-    const pool = new Pool(() => ({}), () => {}, 2);
+    const pool = new Pool(
+      () => ({}),
+      () => {},
+      2,
+    );
     const item = pool.acquire();
     pool.release(item!.index);
     pool.release(item!.index);
@@ -42,7 +66,11 @@ describe('Pool', () => {
   });
 
   it('iterates live entries only, and tolerates release during iteration', () => {
-    const pool = new Pool(() => ({ n: 0 }), () => {}, 5);
+    const pool = new Pool(
+      () => ({ n: 0 }),
+      () => {},
+      5,
+    );
     for (let i = 0; i < 5; i++) pool.acquire()!.item.n = i;
     const seen: number[] = [];
     pool.forEach((item, index) => {
@@ -54,7 +82,11 @@ describe('Pool', () => {
   });
 
   it('clear() releases everything', () => {
-    const pool = new Pool(() => ({}), () => {}, 4);
+    const pool = new Pool(
+      () => ({}),
+      () => {},
+      4,
+    );
     pool.acquire();
     pool.acquire();
     pool.clear();
@@ -95,7 +127,7 @@ describe('SpatialHash', () => {
 
   it('matches brute force on random data', () => {
     const hash = new SpatialHash<number>(48);
-    const points: Array<{ x: number; y: number; r: number }> = [];
+    const points: { x: number; y: number; r: number }[] = [];
     for (let i = 0; i < 400; i++) {
       const point = {
         x: Math.sin(i * 12.9898) * 900,
@@ -121,9 +153,11 @@ describe('SpatialHash', () => {
 });
 
 describe('StateMachine', () => {
-  interface Ctx { log: string[] }
+  interface Ctx {
+    log: string[];
+  }
 
-  const states: Array<State<Ctx>> = [
+  const states: State<Ctx>[] = [
     {
       name: 'idle',
       enter: (c) => c.log.push('enter:idle'),

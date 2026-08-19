@@ -116,8 +116,14 @@ function testDungeon(): Dungeon {
   }
   tiles[3 * width + 6] = Tile.Door;
   return {
-    seed: 0, depth: 1, rooms: [], startRoom: 0, bossRoom: 0,
-    tiles, width, height,
+    seed: 0,
+    depth: 1,
+    rooms: [],
+    startRoom: 0,
+    bossRoom: 0,
+    tiles,
+    width,
+    height,
   };
 }
 

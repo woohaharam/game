@@ -85,7 +85,11 @@ export class GameScene implements Scene {
     // transform and then the camera transform before it means anything to the
     // simulation.
     renderer.pointerToVirtual(input.pointer, this.pointerVirtual);
-    renderer.camera.screenToWorld(this.pointerVirtual.x, this.pointerVirtual.y, this.pointerWorld);
+    renderer.camera.screenToWorld(
+      this.pointerVirtual.x,
+      this.pointerVirtual.y,
+      this.pointerWorld,
+    );
 
     const aim = this.touch.aimOverride ?? this.pointerWorld;
     const intent: PlayerIntent = {
