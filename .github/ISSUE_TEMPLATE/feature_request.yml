@@ -1,0 +1,50 @@
+name: Feature or balance proposal
+description: Suggest new content, a mechanic, or a tuning change.
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Proposals are most useful when they name the problem before the
+        solution — "shooters are unreadable in a crowd" leads somewhere,
+        "add a new enemy" does not.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What is unsatisfying about how it works today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Enemy or boss behaviour
+        - Upgrades and builds
+        - Dungeon generation
+        - Game feel (input, camera, effects)
+        - UI / HUD
+        - Engine or performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Trade-offs
+      description: |
+        What does this cost? An upgrade with no downside stops being a choice,
+        and a mechanic that is strictly better than an existing one deletes it.
+    validations:
+      required: false

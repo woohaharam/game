@@ -23,12 +23,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+
+      # The same gate as CI. Deploy re-runs it rather than trusting the CI run
+      # on the merge commit: this workflow is what publishes, so it is what
+      # has to be sure.
+      - run: npm run verify
 
       - name: Build
         # A project site is served from /<repo>/, so the asset base has to

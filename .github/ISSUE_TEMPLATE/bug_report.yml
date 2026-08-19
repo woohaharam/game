@@ -1,0 +1,73 @@
+name: Bug report
+description: Something behaves incorrectly during play.
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The seed is the single most useful thing you can
+        give us — the entire run is reproducible from it, so with a seed a bug
+        usually goes from "cannot reproduce" to a failing test.
+
+  - type: input
+    id: seed
+    attributes:
+      label: Seed
+      description: Shown on the death screen, and typeable on the title screen.
+      placeholder: '460336050'
+    validations:
+      required: false
+
+  - type: input
+    id: floor
+    attributes:
+      label: Floor and room
+      placeholder: 'Floor 3, the shop'
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: input-method
+    attributes:
+      label: How were you playing?
+      options:
+        - Keyboard and mouse
+        - Touch (phone or tablet)
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: 'Chrome 138 on Windows 11'
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Anything red in the browser devtools console. Rendered as code, no backticks needed.
+      render: text
+    validations:
+      required: false
