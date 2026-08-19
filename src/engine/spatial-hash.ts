@@ -71,10 +71,23 @@ export class SpatialHash<T> {
     }
   }
 
-  /** Collects candidates into an array — convenient in tests. */
-  collect(x: number, y: number, radius: number): T[] {
-    const out: T[] = [];
+  /**
+   * Collects candidates into a caller-owned array, which is cleared first.
+   *
+   * Preferred over `query` in hot paths: reusing one scratch array avoids both
+   * a per-call closure and a per-call allocation, and it lets the caller write
+   * a plain loop. That matters beyond performance — mutating locals inside a
+   * callback defeats TypeScript's control-flow analysis, which then reports
+   * live code as unreachable and pushes you toward casts to silence it.
+   */
+  collectInto(out: T[], x: number, y: number, radius: number): T[] {
+    out.length = 0;
     this.query(x, y, radius, (item) => out.push(item));
     return out;
+  }
+
+  /** Allocates a fresh array of candidates — convenient in tests. */
+  collect(x: number, y: number, radius: number): T[] {
+    return this.collectInto([], x, y, radius);
   }
 }
