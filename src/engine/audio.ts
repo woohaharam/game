@@ -50,9 +50,27 @@ const SFX: Record<SfxName, SfxSpec> = {
   doorOpen: { type: 'sine', freq: 200, freqEnd: 520, duration: 0.35, gain: 0.18 },
   uiMove: { type: 'square', freq: 520, freqEnd: 520, duration: 0.04, gain: 0.09 },
   uiSelect: { type: 'square', freq: 640, freqEnd: 960, duration: 0.11, gain: 0.14 },
-  bossSpawn: { type: 'sawtooth', freq: 90, freqEnd: 220, duration: 0.9, gain: 0.32, noise: 0.25 },
+  bossSpawn: {
+    type: 'sawtooth',
+    freq: 90,
+    freqEnd: 220,
+    duration: 0.9,
+    gain: 0.32,
+    noise: 0.25,
+  },
   gameOver: { type: 'triangle', freq: 300, freqEnd: 70, duration: 1.1, gain: 0.3 },
 };
+
+/**
+ * The audio constructors as the platform actually provides them, rather than
+ * as lib.dom declares them. Intersecting with `Window` would not work: an
+ * optional member intersected with a required one stays required, and the
+ * runtime guard would type-check as dead code.
+ */
+interface AudioGlobals {
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
+}
 
 /** Pentatonic minor — hard to make dissonant, which suits generative music. */
 const SCALE = [0, 3, 5, 7, 10, 12, 15];
@@ -77,9 +95,13 @@ export class AudioBus {
       void this.ctx.resume();
       return;
     }
-    const Ctor: typeof AudioContext | undefined =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    // lib.dom types `window.AudioContext` as always present, which is a
+    // promise the platform does not keep: older WebKit only ships the prefixed
+    // constructor, and locked-down embeddings expose neither. Narrowing to a
+    // view where both are optional keeps the runtime guard honest instead of
+    // making it look like dead code to the type checker.
+    const scope = window as unknown as AudioGlobals;
+    const Ctor = scope.AudioContext ?? scope.webkitAudioContext;
     if (Ctor === undefined) return;
 
     const ctx = new Ctor();

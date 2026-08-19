@@ -127,7 +127,7 @@ function growGraph(rng: Rng, targetRooms: number): Map<string, Cell> {
 }
 
 function addLoops(rng: Rng, cells: Map<string, Cell>): void {
-  const candidates: Array<{ cell: Cell; direction: Direction; other: Cell }> = [];
+  const candidates: { cell: Cell; direction: Direction; other: Cell }[] = [];
   for (const cell of cells.values()) {
     for (const direction of DIRECTIONS) {
       if (cell.links.has(direction)) continue;
@@ -150,9 +150,12 @@ function assignDepths(cells: Map<string, Cell>): void {
   if (start === undefined) return;
 
   start.depth = 0;
+  // Iterating an array that is appended to during the loop is intentional:
+  // array iterators re-read `length` each step, so newly discovered cells are
+  // visited in turn. That gives a breadth-first walk without shift(), which
+  // would be O(n) on every pop.
   const queue: Cell[] = [start];
-  while (queue.length > 0) {
-    const cell = queue.shift() as Cell;
+  for (const cell of queue) {
     for (const direction of cell.links) {
       const v = DIRECTION_VECTORS[direction];
       const next = cells.get(cellKey(cell.x + v.x, cell.y + v.y));
@@ -167,9 +170,7 @@ function assignRoomTypes(rng: Rng, cells: Map<string, Cell>): void {
   const all = [...cells.values()].filter((c) => c.type !== 'start');
   // Dead ends (single link) are the reward slots — reaching one always costs
   // a detour, which is what makes the reward feel earned.
-  const deadEnds = all
-    .filter((c) => c.links.size === 1)
-    .sort((a, b) => b.depth - a.depth);
+  const deadEnds = all.filter((c) => c.links.size === 1).sort((a, b) => b.depth - a.depth);
   const pool = deadEnds.length > 0 ? deadEnds : [...all].sort((a, b) => b.depth - a.depth);
 
   const take = (): Cell | undefined => pool.shift();
@@ -246,7 +247,7 @@ function carve(rng: Rng, cells: Map<string, Cell>, options: GenerateOptions): Du
   };
 
   // Sort for stable room indices regardless of Map iteration order.
-  list.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  list.sort((a, b) => a.y - b.y || a.x - b.x);
 
   const roomByKey = new Map<string, Room>();
 
@@ -312,7 +313,8 @@ function carveCorridors(
 
     // The cell's centre line, which every corridor from this cell runs along.
     const centreX = (cell.x - minCellX) * CELL_WIDTH + MAP_PADDING + Math.floor(CELL_WIDTH / 2);
-    const centreY = (cell.y - minCellY) * CELL_HEIGHT + MAP_PADDING + Math.floor(CELL_HEIGHT / 2);
+    const centreY =
+      (cell.y - minCellY) * CELL_HEIGHT + MAP_PADDING + Math.floor(CELL_HEIGHT / 2);
 
     for (const direction of cell.links) {
       const v = DIRECTION_VECTORS[direction];
@@ -350,12 +352,8 @@ function carveCorridors(
       }
 
       // Door thresholds sit on each room's own wall line.
-      const doorA = isVertical
-        ? { x: centreX, y: fromEdge }
-        : { x: fromEdge, y: centreY };
-      const doorB = isVertical
-        ? { x: centreX, y: toEdge }
-        : { x: toEdge, y: centreY };
+      const doorA = isVertical ? { x: centreX, y: fromEdge } : { x: fromEdge, y: centreY };
+      const doorB = isVertical ? { x: centreX, y: toEdge } : { x: toEdge, y: centreY };
 
       for (let o = -half; o <= half; o++) {
         if (isVertical) {
@@ -401,7 +399,7 @@ function carveObstacles(rng: Rng, room: Room, dungeon: Dungeon, set: SetTile): v
   const cx = x0 + Math.floor(w / 2);
   const cy = y0 + Math.floor(h / 2);
 
-  const blocked: Array<{ x: number; y: number }> = [];
+  const blocked: { x: number; y: number }[] = [];
   const add = (x: number, y: number): void => {
     blocked.push({ x, y });
   };
@@ -457,8 +455,10 @@ function carveObstacles(rng: Rng, room: Room, dungeon: Dungeon, set: SetTile): v
     for (let d = -2; d <= 4; d++) {
       for (let o = -2; o <= 2; o++) {
         if (door.direction === 'north') doorLanes.add(`${door.tileX + o},${door.tileY + d}`);
-        else if (door.direction === 'south') doorLanes.add(`${door.tileX + o},${door.tileY - d}`);
-        else if (door.direction === 'west') doorLanes.add(`${door.tileX + d},${door.tileY + o}`);
+        else if (door.direction === 'south')
+          doorLanes.add(`${door.tileX + o},${door.tileY - d}`);
+        else if (door.direction === 'west')
+          doorLanes.add(`${door.tileX + d},${door.tileY + o}`);
         else doorLanes.add(`${door.tileX - d},${door.tileY + o}`);
       }
     }
@@ -490,11 +490,13 @@ function sealUnreachable(dungeon: Dungeon): void {
   const sx = start.tileX + Math.floor(start.tileWidth / 2);
   const sy = start.tileY + Math.floor(start.tileHeight / 2);
   const reached = new Uint8Array(width * height);
-  const stack: number[] = [sy * width + sx];
-  reached[stack[0] as number] = 1;
+  const startIndex = sy * width + sx;
+  const stack: number[] = [startIndex];
+  reached[startIndex] = 1;
 
   while (stack.length > 0) {
-    const index = stack.pop() as number;
+    const index = stack.pop();
+    if (index === undefined) break;
     const x = index % width;
     const y = (index - x) / width;
     const neighbours = [

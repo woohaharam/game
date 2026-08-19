@@ -18,7 +18,9 @@ export interface Palette {
   accentSoft: string;
 }
 
-export const PALETTES: readonly Palette[] = [
+// Typed as a non-empty tuple so the compiler knows index 0 always exists —
+// that is what lets the depth lookup fall back without a non-null assertion.
+export const PALETTES: readonly [Palette, ...Palette[]] = [
   {
     name: 'Cobalt Vault',
     background: '#05070f',
@@ -65,8 +67,17 @@ export const PALETTES: readonly Palette[] = [
   },
 ];
 
+/**
+ * Palettes cycle with depth, so floor 5 looks like floor 1 again.
+ *
+ * The double modulo keeps the index non-negative: JavaScript's `%` preserves
+ * the sign of the dividend, so a plain `(depth - 1) % length` returns -1 for
+ * depth 0 and reads off the end of the array.
+ */
 export function paletteForDepth(depth: number): Palette {
-  return PALETTES[(depth - 1) % PALETTES.length] as Palette;
+  const count = PALETTES.length;
+  const index = (((depth - 1) % count) + count) % count;
+  return PALETTES[index] ?? PALETTES[0];
 }
 
 export const UI = {
