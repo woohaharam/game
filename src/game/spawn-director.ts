@@ -20,14 +20,18 @@ export interface SpawnPlan {
   budget: number;
 }
 
-interface Weight {
+export interface Weight {
   kind: EnemyKind;
   weight: number;
   /** Not offered before this floor. */
   minDepth: number;
 }
 
-const TABLE: readonly Weight[] = [
+/**
+ * Exported so the balance tooling can experiment with unlock depths without
+ * editing this file. Nothing in the game mutates it.
+ */
+export const SPAWN_TABLE: readonly Weight[] = [
   { kind: 'grunt', weight: 10, minDepth: 1 },
   { kind: 'shooter', weight: 7, minDepth: 1 },
   { kind: 'bomber', weight: 5, minDepth: 2 },
@@ -49,7 +53,7 @@ export function budgetFor(depth: number, roomType: RoomType): number {
  */
 export function planSpawns(rng: Rng, depth: number, roomType: RoomType): SpawnPlan {
   const budget = budgetFor(depth, roomType);
-  const available = TABLE.filter((entry) => entry.minDepth <= depth);
+  const available = SPAWN_TABLE.filter((entry) => entry.minDepth <= depth);
   const kinds: EnemyKind[] = [];
 
   let remaining = budget;
