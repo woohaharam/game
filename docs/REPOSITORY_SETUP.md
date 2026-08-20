@@ -27,7 +27,48 @@ The build sets `PUBLIC_BASE_PATH` to `/<repo>/` because a GitHub Pages _project_
 site is served from a subpath. Without it every asset URL resolves to the domain
 root and the page loads blank.
 
-## 2. Branch protection on `main`
+## 2. The `github-pages` environment pins the branch it was created with
+
+This one produced a failure with nothing to debug, and cost several rounds to
+find. Worth reading before touching Pages.
+
+When Pages is first enabled, GitHub provisions a `github-pages` **environment**
+and attaches a deployment branch policy naming whatever the repository's
+default branch is _at that moment_. That policy is a snapshot. Changing the
+repository's default branch afterwards does **not** update it.
+
+If the two disagree, the `deploy` job is refused on policy grounds before a
+runner is ever assigned:
+
+```
+build    ✅  verify · build · configure-pages · upload-pages-artifact
+deploy   ❌  failed in ~2s — no runner, no steps, no logs to download
+```
+
+Every other signal points the wrong way. Pages is enabled, `configure-pages`
+succeeds, the artifact uploads, the workflow is correct, and the run has no
+error text to read — the API returns an empty check-run output because the job
+never started.
+
+### Fixing it
+
+**Settings → Environments → `github-pages` → Deployment branches and tags**
+
+Either add the branch you actually deploy from, or drop the restriction. If the
+environment is carrying a stale branch name, deleting the environment outright
+is simplest: the next deploy recreates it against the current default branch.
+
+Two checks worth running first, in this order:
+
+```console
+$ git remote show origin | head -3     # is the default branch what you expect?
+  HEAD branch: main
+```
+
+then compare that against the environment's allowed branches. A mismatch is the
+answer; matching values means look elsewhere.
+
+## 3. Branch protection on `main`
 
 **Settings → Rules → Rulesets → New branch ruleset**, targeting `main`.
 
@@ -65,7 +106,7 @@ linear-history rule above. Where a PR's individual commits are worth preserving
 — as with the split between the mechanical reformat and the real changes — say
 so in the PR description and merge with a rebase instead.
 
-## 3. Dependabot
+## 4. Dependabot
 
 Configured in [`.github/dependabot.yml`](../.github/dependabot.yml); no UI
 setup needed. It opens PRs against `main` weekly for npm and monthly for
