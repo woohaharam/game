@@ -21,10 +21,22 @@ export function lerp(a: number, b: number, t: number): number {
 
 /**
  * Frame-rate independent exponential smoothing.
- * `rate` is the fraction of the remaining distance covered per second.
+ *
+ * `rate` is the fraction of the remaining distance covered per second. The
+ * blend factor is memoised per (rate, dt) pair for the same reason
+ * `decayPerStep` is: `Math.exp` has implementation-defined precision, and a
+ * fixed-timestep simulation only ever asks for a handful of pairs.
  */
+const dampCache = new Map<string, number>();
+
 export function damp(a: number, b: number, rate: number, dt: number): number {
-  return lerp(a, b, 1 - Math.exp(-rate * dt));
+  const key = `${rate}:${dt}`;
+  let t = dampCache.get(key);
+  if (t === undefined) {
+    t = 1 - Math.exp(-rate * dt);
+    dampCache.set(key, t);
+  }
+  return lerp(a, b, t);
 }
 
 export function lerpAngle(a: number, b: number, t: number): number {
@@ -39,12 +51,28 @@ export function angleDelta(a: number, b: number): number {
   return d;
 }
 
+/**
+ * Vector length.
+ *
+ * Deliberately `sqrt(x*x + y*y)` rather than `Math.hypot`. The ECMAScript spec
+ * pins `Math.sqrt` to IEEE-754's exactly-rounded square root, but leaves
+ * `Math.hypot`'s precision to the implementation — and V8 evaluates it
+ * differently in optimised and unoptimised code. That is invisible in normal
+ * play and fatal to replays: a run recorded before a function tiers up can
+ * diverge from the same run replayed after it.
+ *
+ * `Math.hypot` also guards against intermediate overflow, which matters for
+ * astronomical magnitudes and never for screen coordinates. It is several
+ * times slower for the trouble.
+ */
 export function length(x: number, y: number): number {
-  return Math.hypot(x, y);
+  return Math.sqrt(x * x + y * y);
 }
 
 export function distance(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 export function distanceSq(a: Vec2, b: Vec2): number {
@@ -55,7 +83,7 @@ export function distanceSq(a: Vec2, b: Vec2): number {
 
 /** Normalises in place and returns the original magnitude. */
 export function normalize(v: Vec2): number {
-  const len = Math.hypot(v.x, v.y);
+  const len = length(v.x, v.y);
   if (len > 1e-6) {
     v.x /= len;
     v.y /= len;
@@ -65,7 +93,7 @@ export function normalize(v: Vec2): number {
 
 /** Caps a vector's magnitude without changing its direction. */
 export function clampLength(v: Vec2, max: number): void {
-  const len = Math.hypot(v.x, v.y);
+  const len = length(v.x, v.y);
   if (len > max && len > 1e-6) {
     v.x = (v.x / len) * max;
     v.y = (v.y / len) * max;
@@ -90,6 +118,29 @@ export function circlesOverlap(
 export function smoothstep(t: number): number {
   const c = clamp(t, 0, 1);
   return c * c * (3 - 2 * c);
+}
+
+/**
+ * Per-second decay applied over one step, as a plain multiplier.
+ *
+ * `rate ** (step * 60)` reads naturally but calls `Math.pow` with a fractional
+ * exponent every frame, for every entity. `Math.pow` is another function whose
+ * precision the spec leaves to the implementation, so — like `Math.hypot` — it
+ * can round differently once V8 optimises the caller, which breaks replays.
+ *
+ * Results are memoised per (rate, step) pair. In practice the simulation runs
+ * at one fixed step with a handful of rates, so the cache holds a few entries
+ * and every call after the first is a lookup.
+ */
+const decayCache = new Map<string, number>();
+
+export function decayPerStep(ratePerSecond: number, step: number): number {
+  const key = `${ratePerSecond}:${step}`;
+  const cached = decayCache.get(key);
+  if (cached !== undefined) return cached;
+  const value = ratePerSecond ** (step * 60);
+  decayCache.set(key, value);
+  return value;
 }
 
 export function easeOutCubic(t: number): number {

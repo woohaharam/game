@@ -1,7 +1,7 @@
 import { Pool } from './pool';
 import type { Renderer } from './renderer';
 import type { Rng } from './rng';
-import { TAU } from './math';
+import { TAU, decayPerStep, length } from './math';
 
 /**
  * Pooled particle system.
@@ -150,7 +150,7 @@ export class ParticleSystem {
         return;
       }
       // Per-second drag raised to the step keeps decay frame-rate independent.
-      const drag = p.drag ** (step * 60);
+      const drag = decayPerStep(p.drag, step);
       p.vx *= drag;
       p.vy *= drag;
       p.x += p.vx * step;
@@ -181,8 +181,8 @@ export class ParticleSystem {
           break;
         case 'spark': {
           // Streak length follows velocity, which reads as speed.
-          const len = Math.min(14, Math.hypot(p.vx, p.vy) * 0.05);
-          const inv = 1 / (Math.hypot(p.vx, p.vy) || 1);
+          const len = Math.min(14, length(p.vx, p.vy) * 0.05);
+          const inv = 1 / (length(p.vx, p.vy) || 1);
           ctx.strokeStyle = p.color;
           ctx.lineWidth = p.size * t;
           ctx.beginPath();

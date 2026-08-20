@@ -1,3 +1,4 @@
+import { length } from '@engine/math';
 import { TILE_SIZE, Tile, type Dungeon, type TileId } from '@game/dungeon/types';
 
 /**
@@ -140,7 +141,7 @@ export function hasLineOfSight(
 ): boolean {
   const dx = toX - fromX;
   const dy = toY - fromY;
-  const distance = Math.hypot(dx, dy);
+  const distance = length(dx, dy);
   if (distance < 1) return true;
 
   // Half-tile steps: fine enough not to skip a one-tile pillar, coarse enough

@@ -1,5 +1,5 @@
 import { StateMachine, type State } from '@engine/fsm';
-import { TAU, angleDelta, clamp, damp } from '@engine/math';
+import { TAU, angleDelta, clamp, damp, decayPerStep, length } from '@engine/math';
 import { ENEMIES, ENEMY_BULLET, SCALING, type EnemyKind } from '@game/config';
 import type { CombatContext } from './context';
 
@@ -120,7 +120,7 @@ export class Enemy {
     this.y += this.vy * step;
 
     // Friction is per-second so behaviour is identical at any tick rate.
-    const friction = 0.86 ** (step * 60);
+    const friction = decayPerStep(0.86, step);
     this.vx *= friction;
     this.vy *= friction;
   }
@@ -136,7 +136,7 @@ export class Enemy {
   steerToward(targetX: number, targetY: number, step: number, speedScale = 1): void {
     const dx = targetX - this.x;
     const dy = targetY - this.y;
-    const distance = Math.hypot(dx, dy) || 1;
+    const distance = length(dx, dy) || 1;
     const desiredX = (dx / distance) * this.speed * speedScale;
     const desiredY = (dy / distance) * this.speed * speedScale;
     this.vx = damp(this.vx, desiredX, 8, step);
@@ -152,7 +152,7 @@ export class Enemy {
 
   /** @internal */
   distanceToPlayer(world: CombatContext): number {
-    return Math.hypot(world.playerX - this.x, world.playerY - this.y);
+    return length(world.playerX - this.x, world.playerY - this.y);
   }
 
   /** @internal */
