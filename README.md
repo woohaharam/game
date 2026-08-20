@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/woohaharam/game/actions/workflows/deploy.yml/badge.svg)](https://github.com/woohaharam/game/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-881-brightgreen)
+![Tests](https://img.shields.io/badge/tests-895-brightgreen)
 ![Bundle](https://img.shields.io/badge/bundle-30%20KB%20gzipped-brightgreen)
 
 A 2D action roguelike that runs in the browser. Procedurally generated dungeons,
@@ -65,6 +65,10 @@ so playing aggressively pays more than clearing a room from the safest corner.
 
 Type a seed on the title screen to replay a specific run — numbers or words both
 work.
+
+Every run is recorded. Press `↑` on the title screen to watch your best one
+back, or `↓` on the death screen to copy the run to your clipboard as text —
+a few kilobytes that anyone with the game can paste in and watch.
 
 <table>
 <tr>

@@ -6,6 +6,8 @@ import { profileStore } from '@game/save-data';
 import type { RunState } from '@game/run-state';
 import { GameScene } from './game-scene';
 import { MenuScene } from './menu-scene';
+import type { ReplayData } from '@game/replay/format';
+import { exportReplay, replaySize } from '@game/replay/storage';
 
 /**
  * Death summary.
@@ -24,9 +26,14 @@ export class GameOverScene implements Scene {
   private readonly summary: [string, string][];
   private readonly newBest: boolean;
 
+  /** Transient status line for the copy-to-clipboard action. */
+  private notice = '';
+  private noticeTimer = 0;
+
   constructor(
     private readonly run: RunState,
     private readonly seed: number,
+    private readonly replay: ReplayData | null = null,
   ) {
     // Snapshot the profile before it is compared, so "NEW BEST" is honest even
     // though the store was already updated when the run ended.
@@ -56,6 +63,18 @@ export class GameOverScene implements Scene {
       return;
     }
 
+    this.noticeTimer = Math.max(0, this.noticeTimer - step);
+
+    if (this.replay !== null && input.wasPressed('up')) {
+      audio.play('uiSelect');
+      stack.replaceAll(new GameScene(this.seed, this.replay));
+      return;
+    }
+    if (this.replay !== null && input.wasPressed('down')) {
+      audio.play('uiMove');
+      this.copyReplay();
+      return;
+    }
     if (
       input.wasPressed('restart') ||
       input.wasPressed('confirm') ||
@@ -70,6 +89,43 @@ export class GameOverScene implements Scene {
       stack.replaceAll(new MenuScene());
       return;
     }
+  }
+
+  /**
+   * Copies the run to the clipboard as text.
+   *
+   * Clipboard rather than a file download: downloads are blocked outright in
+   * some embeddings, and a text blob pastes into a message or an issue, which
+   * is where a shared run actually goes.
+   */
+  private copyReplay(): void {
+    const replay = this.replay;
+    if (replay === null) return;
+    const text = exportReplay(replay);
+
+    // lib.dom types `navigator.clipboard` as always present. It is not: the
+    // API is gated on a secure context, so a page served over plain http has
+    // no clipboard at all. Narrow it rather than let the optional chain read
+    // as dead code.
+    const { clipboard } = navigator as unknown as { clipboard?: Clipboard };
+    if (clipboard === undefined) {
+      this.notice = 'Clipboard needs a secure (https) page';
+      this.noticeTimer = 3;
+      return;
+    }
+
+    void clipboard
+      .writeText(text)
+      .then(() => {
+        this.notice = `Replay copied — ${(replaySize(replay) / 1024).toFixed(1)} KB`;
+        this.noticeTimer = 3;
+      })
+      .catch(() => {
+        // Clipboard access can be denied outright; say so rather than
+        // pretending the copy worked.
+        this.notice = 'Clipboard blocked by the browser';
+        this.noticeTimer = 3;
+      });
   }
 
   render(_alpha: number, context: SceneContext): void {
@@ -155,16 +211,23 @@ export class GameOverScene implements Scene {
       align: 'center',
       letterSpacing: '2px',
     });
-    renderer.text(
-      'R / CLICK — retry this seed      ESC — main menu',
-      width / 2,
-      height * 0.94,
-      {
-        size: 13,
-        color: UI.combo,
+    const hints =
+      this.replay === null
+        ? 'R / CLICK — retry this seed      ESC — main menu'
+        : 'R — retry seed    ↑ watch replay    ↓ copy replay    ESC — menu';
+    renderer.text(hints, width / 2, height * 0.94, {
+      size: 13,
+      color: UI.combo,
+      align: 'center',
+    });
+
+    if (this.noticeTimer > 0) {
+      renderer.text(this.notice, width / 2, height * 0.985, {
+        size: 12,
+        color: UI.coin,
         align: 'center',
-      },
-    );
+      });
+    }
 
     renderer.ctx.globalAlpha = 1;
   }

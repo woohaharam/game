@@ -62,14 +62,29 @@ import { rollChoices, type UpgradeDef } from '@game/progression/upgrades';
 
 export type RoomPhase = 'idle' | 'spawning' | 'combat' | 'cleared';
 
+/**
+ * One tick of player will, expressed in terms the simulation cares about.
+ *
+ * Aim is an **angle**, not a screen point. The simulation only ever needed the
+ * direction — a cursor position had to be converted to one anyway — and an
+ * angle is the same shape whether it came from a mouse, a thumbstick or a
+ * recorded replay. It is also finitely quantisable, which is what lets a run be
+ * recorded and replayed bit-for-bit.
+ */
 export interface PlayerIntent {
   move: Vec2;
-  /** Aim target in world coordinates. */
-  aimX: number;
-  aimY: number;
+  /** Aim direction in radians. */
+  aimAngle: number;
   firing: boolean;
   dashPressed: boolean;
 }
+
+/**
+ * How far ahead of the player the camera leans, in the aim direction. Constant
+ * rather than proportional to cursor distance, so the framing is identical for
+ * a mouse held just off the ship and one parked at the edge of the room.
+ */
+const CAMERA_LEAD = 96;
 
 export interface Pedestal {
   x: number;
@@ -333,11 +348,11 @@ export class World implements CombatContext {
     this.particles.update(step);
     this.updateRoom(step);
 
+    // Lead the camera toward where the player is aiming, so they can see what
+    // they are shooting at without it drifting off the ship entirely.
     this.camera.follow(
-      // Lead the camera toward the crosshair so the player can see what they
-      // are aiming at, without letting it drift off them entirely.
-      this.player.x + clamp(intent.aimX - this.player.x, -110, 110) * 0.25,
-      this.player.y + clamp(intent.aimY - this.player.y, -110, 110) * 0.25,
+      this.player.x + Math.cos(intent.aimAngle) * CAMERA_LEAD,
+      this.player.y + Math.sin(intent.aimAngle) * CAMERA_LEAD,
       step,
     );
     this.camera.update(rawStep);
@@ -347,7 +362,7 @@ export class World implements CombatContext {
     const player = this.player;
     if (!player.alive) return;
 
-    player.aimAngle = Math.atan2(intent.aimY - player.y, intent.aimX - player.x);
+    player.aimAngle = intent.aimAngle;
     if (intent.dashPressed) player.requestDash();
     if (intent.firing) player.requestFire();
 
