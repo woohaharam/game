@@ -1,4 +1,4 @@
-import { clamp, damp, type Vec2 } from '@engine/math';
+import { clamp, damp, length, type Vec2 } from '@engine/math';
 import { PLAYER } from '@game/config';
 import type { PlayerStats } from '@game/progression/stats';
 
@@ -127,7 +127,7 @@ export class Player {
     this.y += this.vy * step;
 
     // Face the way we are aiming, easing so quick flicks still look smooth.
-    const moving = Math.hypot(this.vx, this.vy) > 12;
+    const moving = length(this.vx, this.vy) > 12;
     const target = moving && !this.isDashing ? Math.atan2(this.vy, this.vx) : this.aimAngle;
     const delta = ((target - this.facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
     this.facing += delta * clamp(step * 16, 0, 1);
@@ -136,7 +136,7 @@ export class Player {
   private startDash(move: Vec2, stats: PlayerStats): void {
     // Dash toward the movement stick when there is one, otherwise toward the
     // crosshair — dashing "nowhere" because no key was held feels broken.
-    const hasMove = Math.hypot(move.x, move.y) > 0.1;
+    const hasMove = length(move.x, move.y) > 0.1;
     this.dashAngle = hasMove ? Math.atan2(move.y, move.x) : this.aimAngle;
     this.dashTimer = PLAYER.dashDuration;
     this.dashCooldown = stats.dashCooldown;

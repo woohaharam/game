@@ -316,6 +316,39 @@ The roll itself still happens in both modes. It draws from the gameplay RNG, so
 skipping it during playback would desynchronise every later draw — only the
 _picking_ differs.
 
+### How deterministic is it, really
+
+Not absolutely, and the CI matrix is what proved it.
+
+The strict test — record a run, replay it, compare the entire end state — passed
+locally and on Node 22, and failed on **Node 20**. Discrete state matched
+exactly (score, kills, health, rooms cleared) while position had drifted 147
+pixels, with velocity differing in the eighth significant figure.
+
+That is not a logic bug. ECMAScript pins `+`, `-`, `*`, `/` and `Math.sqrt` to
+exactly-rounded IEEE-754, but leaves `Math.hypot`, `Math.pow`, `Math.sin` and
+friends to the implementation — and V8 may evaluate them differently once a
+function tiers up from interpreted to optimised. The record loop runs before
+the playback loop, so playback runs against hotter code. In a chaotic system a
+difference in the last bit becomes a different room a minute later.
+
+Two of the three worst offenders were removable, so they were:
+
+- `Math.hypot` → `sqrt(x*x + y*y)`, which is exactly specified. It is also
+  **13.6× faster** in a 20M-iteration benchmark, which is its own reason.
+- `rate ** (step * 60)` → a memoised per-step constant. At a fixed timestep the
+  exponent never varies, so the `Math.pow` call was pure overhead.
+
+`Math.sin`, `Math.cos` and `Math.atan2` remain, and cannot be removed without a
+fixed-point or software-float math layer. That is exactly why lockstep
+multiplayer games use fixed-point arithmetic, and it is out of scope here.
+
+So the honest claim is: **a replay reproduces its run exactly on the engine
+that recorded it.** Across engine versions it may diverge. Replays therefore
+carry a version that is bumped when the _simulation_ changes, not only when the
+format does — a stale replay that plays back plausibly and wrongly is worse
+than one that is refused.
+
 ### Testing it
 
 `tests/replay.test.ts` records a scripted run, replays the recording into a

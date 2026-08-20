@@ -1,4 +1,4 @@
-import { clamp, type Vec2 } from './math';
+import { clamp, length, type Vec2 } from './math';
 
 /**
  * Input aggregation.
@@ -154,7 +154,7 @@ export class Input {
       out.x = (this.isHeld('right') ? 1 : 0) - (this.isHeld('left') ? 1 : 0);
       out.y = (this.isHeld('down') ? 1 : 0) - (this.isHeld('up') ? 1 : 0);
     }
-    const len = Math.hypot(out.x, out.y);
+    const len = length(out.x, out.y);
     if (len > 1) {
       out.x /= len;
       out.y /= len;

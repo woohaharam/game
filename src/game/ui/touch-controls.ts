@@ -1,6 +1,6 @@
 import type { Input } from '@engine/input';
 import type { Renderer } from '@engine/renderer';
-import { clamp, vec2, type Vec2 } from '@engine/math';
+import { clamp, length, vec2, type Vec2 } from '@engine/math';
 
 /**
  * On-screen twin-stick controls for touch devices.
@@ -149,7 +149,7 @@ export class TouchControls {
     if (this.moveStick.active) {
       const dx = (this.moveStick.x - this.moveStick.originX) / STICK_RADIUS;
       const dy = (this.moveStick.y - this.moveStick.originY) / STICK_RADIUS;
-      const magnitude = Math.hypot(dx, dy);
+      const magnitude = length(dx, dy);
       if (magnitude < DEAD_ZONE) input.setStick(0, 0);
       else {
         const scale = Math.min(1, magnitude) / magnitude;
@@ -162,7 +162,7 @@ export class TouchControls {
     if (this.aimStick.active) {
       const dx = this.aimStick.x - this.aimStick.originX;
       const dy = this.aimStick.y - this.aimStick.originY;
-      const magnitude = Math.hypot(dx, dy) / STICK_RADIUS;
+      const magnitude = length(dx, dy) / STICK_RADIUS;
       if (magnitude > DEAD_ZONE) {
         // Aim is a direction, projected far ahead of the player so the world
         // gets the same "point at a spot" intent the mouse produces.
@@ -188,7 +188,7 @@ export class TouchControls {
       if (!stick.active) continue;
       const dx = stick.x - stick.originX;
       const dy = stick.y - stick.originY;
-      const distance = Math.hypot(dx, dy);
+      const distance = length(dx, dy);
       const clamped = clamp(distance, 0, STICK_RADIUS);
       const angle = Math.atan2(dy, dx);
 
@@ -217,6 +217,6 @@ export class TouchControls {
 
   /** Screen-space hit test for the touch dash button. */
   isDashButton(renderer: Renderer, x: number, y: number): boolean {
-    return Math.hypot(x - (renderer.width - 74), y - (renderer.height - 74)) < 40;
+    return length(x - (renderer.width - 74), y - (renderer.height - 74)) < 40;
   }
 }

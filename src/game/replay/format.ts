@@ -23,8 +23,17 @@ import type { PlayerIntent } from '@game/world';
  *    in angle costs one byte where the absolute value costs two.
  */
 
-/** Bumped whenever the byte layout changes; older payloads are rejected. */
-export const REPLAY_VERSION = 1;
+/**
+ * Bumped whenever the byte layout **or the simulation** changes.
+ *
+ * A replay stores decisions, not outcomes, so it is only meaningful against
+ * the rules that produced it. Version 2 exists because the maths changed, not
+ * the format: swapping `Math.hypot` for `sqrt(x*x + y*y)` shifts results in the
+ * last few digits, and over a few thousand ticks that is enough to send a run
+ * somewhere else entirely. A stale replay would play back plausibly and
+ * wrongly, which is worse than refusing it.
+ */
+export const REPLAY_VERSION = 2;
 
 const MAGIC = 0x4e44; // "ND"
 

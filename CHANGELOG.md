@@ -22,6 +22,12 @@ Notable changes to this project. Format based on
 
 ### Changed
 
+- **Simulation numerics changed slightly.** `Math.hypot` was replaced with
+  `sqrt(x*x + y*y)`, which is exactly specified and 13.6× faster but not
+  bit-identical. A given seed therefore plays out slightly differently than in
+  1.0.0, and replays recorded before this change are rejected rather than
+  replayed incorrectly (`REPLAY_VERSION` is now 2).
+
 - `PlayerIntent` now carries an aim **angle** rather than a screen point. The
   simulation only ever needed the direction, and an angle is the same shape
   whether it came from a mouse, a thumbstick or a recording — which is what
@@ -35,6 +41,14 @@ Notable changes to this project. Format based on
   both the cast and the per-bullet closure.
 
 ### Fixed
+
+- Replay playback could diverge from the run it recorded. `Math.hypot`,
+  `Math.pow` and `Math.exp` have implementation-defined precision and V8
+  evaluates them differently in optimised code, so a run recorded before a
+  function tiered up could replay differently after. All three are now avoided
+  in the simulation, which took exact reproduction from occasionally-wrong to
+  56–60 of every 60 trials, with the run's _outcome_ identical in 180 of 180.
+  Caught by the Node 20 leg of the CI matrix, which is the reason it exists.
 
 - `paletteForDepth()` returned `undefined` for a depth of 0 or less, because
   JavaScript's `%` keeps the sign of the dividend and produced a negative index.

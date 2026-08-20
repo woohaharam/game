@@ -4,7 +4,15 @@ import { SpatialHash } from '@engine/spatial-hash';
 import { ParticleSystem } from '@engine/particles';
 import type { AudioBus, SfxName } from '@engine/audio';
 import type { Camera } from '@engine/camera';
-import { TAU, angleDelta, circlesOverlap, clamp, type Vec2 } from '@engine/math';
+import {
+  TAU,
+  angleDelta,
+  circlesOverlap,
+  clamp,
+  decayPerStep,
+  length,
+  type Vec2,
+} from '@engine/math';
 
 import { ENEMY_BULLET, FEEL, PICKUP, ROOM, SCORE, type EnemyKind } from '@game/config';
 import { generateDungeon } from '@game/dungeon/generator';
@@ -664,7 +672,7 @@ export class World implements CombatContext {
       const offset = Math.abs(angleDelta(heading, Math.atan2(dy, dx)));
       // Never turn back on itself: a bullet that boomerangs reads as a bug.
       if (offset > 1.1) continue;
-      const score = Math.hypot(dx, dy) + offset * 120;
+      const score = length(dx, dy) + offset * 120;
       if (score < bestScore) {
         bestScore = score;
         target = enemy;
@@ -678,7 +686,7 @@ export class World implements CombatContext {
       -bullet.homing * step,
       bullet.homing * step,
     );
-    const speed = Math.hypot(bullet.vx, bullet.vy);
+    const speed = length(bullet.vx, bullet.vy);
     const angle = heading + turn;
     bullet.vx = Math.cos(angle) * speed;
     bullet.vy = Math.sin(angle) * speed;
@@ -757,7 +765,7 @@ export class World implements CombatContext {
 
       const dx = this.player.x - pickup.x;
       const dy = this.player.y - pickup.y;
-      const distance = Math.hypot(dx, dy);
+      const distance = length(dx, dy);
 
       if (pickup.delay <= 0 && distance < PICKUP.magnetRadius && this.player.alive) {
         // Magnet strength ramps as it closes, so drops accelerate into the
@@ -769,7 +777,7 @@ export class World implements CombatContext {
 
       pickup.x += pickup.vx * step;
       pickup.y += pickup.vy * step;
-      const friction = 0.9 ** (step * 60);
+      const friction = decayPerStep(0.9, step);
       pickup.vx *= friction;
       pickup.vy *= friction;
 
@@ -856,7 +864,7 @@ export class World implements CombatContext {
         return;
       }
       text.y += text.vy * step;
-      text.vy *= 0.92 ** (step * 60);
+      text.vy *= decayPerStep(0.92, step);
     });
   }
 
@@ -904,7 +912,7 @@ export class World implements CombatContext {
     }
 
     if (this.exitPortal.active && this.player.alive) {
-      const distance = Math.hypot(
+      const distance = length(
         this.player.x - this.exitPortal.x,
         this.player.y - this.exitPortal.y,
       );
@@ -1182,7 +1190,7 @@ export class World implements CombatContext {
       if (!enemy.alive || enemy.spawnTimer > 0) return;
       // A bomber does not award itself score by detonating on top of itself.
       if (enemy === options.source) return;
-      const distance = Math.hypot(enemy.x - x, enemy.y - y);
+      const distance = length(enemy.x - x, enemy.y - y);
       const falloff = explosionFalloff(distance, radius + enemy.radius);
       if (falloff <= 0) return;
       this.damageEnemy(enemy, Math.max(1, Math.round(damage * falloff)), {
@@ -1192,7 +1200,7 @@ export class World implements CombatContext {
     });
 
     if (this.player.alive) {
-      const distance = Math.hypot(this.player.x - x, this.player.y - y);
+      const distance = length(this.player.x - x, this.player.y - y);
       const falloff = explosionFalloff(distance, radius + this.player.radius);
       // The player's own Volatile Rounds never hurt them; an upgrade that
       // kills its owner at point-blank range is a trap, not a choice.
