@@ -6,15 +6,22 @@ reproducible rather than living only in one person's memory.
 
 ## 1. GitHub Pages
 
-**Settings → Pages → Build and deployment → Source → GitHub Actions**
+`deploy.yml` passes `enablement: true` to `actions/configure-pages`, so the
+Pages site is created on the first run rather than having to be switched on by
+hand. Nothing to do here in the normal case — the workflow configures itself.
 
-Until this is switched on, `deploy.yml` runs on every push to `main` and fails
-at the publish step with `Resource not accessible by integration`. The workflow
-itself needs no change — Pages just has to be expecting a deployment from
-Actions rather than from a branch.
+**Repository visibility matters more than the toggle.** Pages on a _private_
+repository is a paid feature (Pro, Team or Enterprise). On the Free plan the
+repository has to be public for the site to publish at all — which is also what
+you want for a portfolio piece, since the whole point is that someone can open
+the link and play.
 
-Once enabled, the site is live at `https://woohaharam.github.io/game/`, and the
-play link in the README starts working.
+Once published, the site is live at `https://woohaharam.github.io/game/`, and
+the play link in the README starts working.
+
+If Pages ever needs to be set by hand — for example after being disabled —
+the setting is **Settings → Pages → Build and deployment → Source → GitHub
+Actions**.
 
 The build sets `PUBLIC_BASE_PATH` to `/<repo>/` because a GitHub Pages _project_
 site is served from a subpath. Without it every asset URL resolves to the domain

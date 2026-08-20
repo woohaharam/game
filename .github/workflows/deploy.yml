@@ -41,6 +41,11 @@ jobs:
         run: npx vite build
 
       - uses: actions/configure-pages@v5
+        with:
+          # Creates the Pages site on first run instead of failing when it does
+          # not exist yet, so deployment is configured by this file rather than
+          # by a setting somebody has to remember to flip in the UI.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
