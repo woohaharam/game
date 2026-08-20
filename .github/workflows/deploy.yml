@@ -45,7 +45,7 @@ jobs:
       # `pages: write` — it fails with "Resource not accessible by integration".
       # Enabling Pages is a one-time manual step; see docs/REPOSITORY_SETUP.md.
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
