@@ -27,7 +27,31 @@ The build sets `PUBLIC_BASE_PATH` to `/<repo>/` because a GitHub Pages _project_
 site is served from a subpath. Without it every asset URL resolves to the domain
 root and the page loads blank.
 
-## 2. Branch protection on `main`
+## 2. The default branch must be `main`
+
+**Settings → General → Default branch**
+
+This one is easy to miss and produces a failure that looks like nothing at all.
+
+When GitHub first creates the `github-pages` environment it attaches a
+deployment branch policy limited to the repository's **default branch**. If the
+default is still some other branch, a deploy triggered from `main` is rejected
+_before the job starts_ — no runner is assigned, no step runs, and there are no
+logs to download. The run simply shows:
+
+```
+build    ✅  (verify, build, configure-pages, upload-pages-artifact all green)
+deploy   ❌  failed in ~1s
+```
+
+The build half succeeding is what makes this confusing: Pages is enabled, the
+artifact is uploaded, and nothing in the workflow is wrong. The deployment is
+refused on policy grounds.
+
+If a deploy fails this way, check the default branch before anything else.
+`git remote show origin | head -3` prints it without opening the browser.
+
+## 3. Branch protection on `main`
 
 **Settings → Rules → Rulesets → New branch ruleset**, targeting `main`.
 
@@ -65,7 +89,7 @@ linear-history rule above. Where a PR's individual commits are worth preserving
 — as with the split between the mechanical reformat and the real changes — say
 so in the PR description and merge with a rebase instead.
 
-## 3. Dependabot
+## 4. Dependabot
 
 Configured in [`.github/dependabot.yml`](../.github/dependabot.yml); no UI
 setup needed. It opens PRs against `main` weekly for npm and monthly for
