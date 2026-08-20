@@ -89,6 +89,18 @@ export default tseslint.config(
   },
 
   {
+    // Developer tooling, not shipped code. It reaches into world internals on
+    // purpose and asserts on invariants the type system cannot see — the same
+    // latitude tests get, for the same reason.
+    files: ['tools/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      'no-console': 'off',
+    },
+  },
+
+  {
     files: ['*.config.js', '*.config.ts'],
     languageOptions: {
       globals: { ...globals.node },

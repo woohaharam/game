@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/woohaharam/game/actions/workflows/deploy.yml/badge.svg)](https://github.com/woohaharam/game/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-895-brightgreen)
+![Tests](https://img.shields.io/badge/tests-903-brightgreen)
 ![Bundle](https://img.shields.io/badge/bundle-30%20KB%20gzipped-brightgreen)
 
 A 2D action roguelike that runs in the browser. Procedurally generated dungeons,
@@ -91,6 +91,7 @@ npm run dev        # dev server with hot reload
 ```
 
 ```bash
+npm run balance    # simulate hundreds of runs and print a balance report
 npm run verify     # everything CI runs: format, lint, typecheck, tests
 npm test           # unit + headless integration tests
 npm run lint       # type-aware ESLint
@@ -132,7 +133,8 @@ tests/             Vitest suites, including headless simulation runs
 ```
 
 Design notes and the reasoning behind the bigger decisions live in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and the latest simulated
+balance report in [`docs/BALANCE.md`](docs/BALANCE.md).
 
 ## Development workflow
 

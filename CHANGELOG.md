@@ -8,6 +8,14 @@ Notable changes to this project. Format based on
 
 ### Added
 
+- **Balance simulation** (`npm run balance`). Runs the real game headlessly
+  with a scripted bot and reports floor survival with confidence intervals,
+  time-to-kill per enemy archetype, upgrade uptake and run shape. Output is
+  committed at `docs/BALANCE.md`. First finding: floor 2 is a difficulty cliff
+  — 74% of runs clear floor 1, 36% clear floor 2.
+- **Grid pathfinding for the bot** (`tools/pathfinder.ts`), after measuring
+  that the straight line between adjacent room centres is blocked 21% of the
+  time by interior cover.
 - **Replays.** A run is recorded as its seed plus the quantised intent stream
   and re-simulates on playback, so a full run is a few kilobytes rather than a
   video. Watchable from the title screen or the death screen, and copyable to
@@ -32,6 +40,9 @@ Notable changes to this project. Format based on
   simulation only ever needed the direction, and an angle is the same shape
   whether it came from a mouse, a thumbstick or a recording — which is what
   makes an intent finitely quantisable.
+- `tools/` is now type-checked and linted. It had been outside `tsconfig`'s
+  `include`, which let the bot set a field the world did not read and produce
+  `NaN` positions in silence.
 - Pinned TypeScript to 5.9. TypeScript 7 compiles the project, but
   `typescript-eslint` does not yet support it, and a toolchain where the linter
   cannot run is not worth the newer compiler.

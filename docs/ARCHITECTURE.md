@@ -365,7 +365,74 @@ they described different ticks. Freezing the loop before reading made them
 identical. Worth recording because a one-quantum difference looks exactly like
 a real quantisation bug.
 
-## 13. Game feel
+## 13. Balance simulation
+
+`tools/`, `npm run balance`
+
+Balance was tuned by feel, which is fine for a first pass and useless for
+answering "did that change make floor 4 harder, or did I just play worse?".
+The simulator runs the real game — same `World`, same rules — hundreds of times
+with a scripted player and reports where runs actually end.
+
+This is only possible because the simulation never touches the DOM. A run that
+takes three minutes to play takes ~200 ms to simulate, so 500 of them fit in
+100 seconds.
+
+Everything the tool measures is **observational**. It reads public world state
+each tick and infers the rest — time-to-kill from when an enemy first becomes
+active and when it stops being alive, damage taken from health dropping. No
+measurement hook was added to the simulation, so what is measured is exactly
+what ships.
+
+### The bot is the instrument, so it is written to be boring
+
+It kites at a fixed range, strafes rather than charging, dashes out of incoming
+fire after a reaction delay, and takes upgrades in a fixed preference order.
+Deliberately _competent, not optimal_: an optimal bot measures a ceiling nobody
+plays at. What matters is that it plays the same way every time, so when a
+tuning change moves floor-2 survival from 44% to 30%, the change did that.
+
+Its numbers are a lower bound on human performance, not a prediction of it. It
+does not lead moving targets, use cover, or bait attacks.
+
+### The assumption that cost the most
+
+The bot first navigated by walking from room centre to room centre, on the
+reasoning that rooms sit centred in their cells and corridors run along the
+cell centre line — so the straight line between adjacent room centres should
+pass through the door joining them.
+
+Measured across 1,416 adjacent room pairs on 60 seeds, that line is blocked
+**21% of the time**. Interior cover sits in the way. A one-in-five per-hop
+failure compounds: over half of all runs were being abandoned as stalled, which
+meant the survival numbers were measuring pathing rather than difficulty.
+
+Four attempted fixes — holding a destination, adding a centre waypoint,
+committing to a goal room, suppressing replans in corridors — each moved the
+stall rate by a few points and none addressed the cause, because the premise
+itself was wrong. Measuring the premise directly took five minutes and settled
+it. `tools/pathfinder.ts` now does breadth-first search over the tile grid with
+line-of-sight smoothing, and `tests/pathfinder.test.ts` pins both the routine
+and the 21% measurement that justified it.
+
+### Stalls are reported, not hidden
+
+A run the bot abandons is a measurement failure, not a result, so the report
+excludes it _and_ says which kind it was — a route it could not find, versus a
+fight it could not finish behind locked doors. Those have different causes and
+one of them is a statement about the game rather than the bot.
+
+Roughly 45% of runs still stall. That is the harness's main limitation and it
+is stated at the top of every report.
+
+### What it found
+
+The generated report lives at [`BALANCE.md`](BALANCE.md). The most useful thing
+it surfaced immediately: **floor 2 is where runs end.** 74% of runs clear floor
+1, and only 36% clear floor 2 — a much sharper step than any other floor
+transition, and not something that was visible from playing.
+
+## 14. Game feel
 
 `src/game/config.ts` (the `FEEL` block)
 
@@ -396,8 +463,9 @@ Being straight about what is not here:
   but Canvas 2D keeps the renderer readable, which suits the purpose here.
 - **No gamepad support.** The input layer is built for it; it is simply not
   wired up.
-- **Balance is tuned by hand**, not by simulation sweeps. The headless test
-  harness could drive automated balance runs; that work has not been done.
+- **The balance bot stalls on roughly 45% of runs**, mostly by failing to
+  navigate. Those runs are excluded and classified, but a lower stall rate
+  would tighten every interval in the report.
 - **The boss is one archetype re-skinned by depth**, with scaling health and an
   extra spiral arm per phase. Distinct bosses per floor would be better.
 - **No leaderboard.** Replays are kept locally — the last run and the best-scoring one — and can be copied out as text, but there is nowhere to submit them.
