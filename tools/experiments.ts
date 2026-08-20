@@ -63,12 +63,15 @@ export const VARIANTS: readonly Variant[] = [
     },
   },
   {
-    name: 'stagger-unlocks',
-    rationale: 'bomber and turret both unlock on floor 2; spread them out',
+    // The inverse of the change that shipped, kept so the result stays
+    // reproducible: this restores the old simultaneous unlock and should now
+    // measure as *harder*.
+    name: 'revert-stagger',
+    rationale: 'put bomber and turret back on floor 2 together (pre-fix behaviour)',
     apply: () => {
       setUnlock('bomber', 2);
-      setUnlock('turret', 3);
-      setUnlock('brute', 4);
+      setUnlock('turret', 2);
+      setUnlock('brute', 3);
     },
   },
   // The budget line is a dose-response check. One variant showing an effect
@@ -107,11 +110,8 @@ export const VARIANTS: readonly Variant[] = [
     // noise. If the floor-2 step is the sum of four simultaneous escalations
     // rather than any one of them, only changing all of them should show.
     name: 'combined',
-    rationale: 'stagger unlocks, soften budget and health together',
+    rationale: 'soften budget and health together, on top of staggered unlocks',
     apply: () => {
-      setUnlock('bomber', 2);
-      setUnlock('turret', 3);
-      setUnlock('brute', 4);
       scaling.budgetPerDepth = 1.25;
       scaling.enemyHealthPerDepth = 0.16;
     },
