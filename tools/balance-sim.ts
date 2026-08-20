@@ -413,12 +413,14 @@ function parseArgs(argv: readonly string[]): {
   seed: number;
   trace: number | null;
   experiments: boolean;
+  only: string | null;
 } {
   let runs = 300;
   let write = false;
   let seed = 1;
   let trace: number | null = null;
   let experiments = false;
+  let only: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--runs') runs = Number(argv[++i]) || runs;
@@ -426,8 +428,9 @@ function parseArgs(argv: readonly string[]): {
     else if (arg === '--trace') trace = Number(argv[++i]);
     else if (arg === '--write') write = true;
     else if (arg === '--experiments') experiments = true;
+    else if (arg === '--only') only = argv[++i] ?? null;
   }
-  return { runs, write, seed, trace, experiments };
+  return { runs, write, seed, trace, experiments, only };
 }
 
 /**
@@ -445,13 +448,16 @@ function parseArgs(argv: readonly string[]): {
  * swamping the effect being measured. The same data then answers the question
  * several times more precisely.
  */
-function runExperiments(runs: number, seed: number): void {
+function runExperiments(runs: number, seed: number, only: string | null): void {
   const saved = snapshot();
+  // `--only` narrows the sweep to one variant plus the baseline, so a specific
+  // question can be answered with many more seeds in the same wall-clock time.
+  const selected = VARIANTS.filter((v) => only === null || v.name === only || v.name === 'baseline');
 
   // depth reached per seed, per variant
   const byVariant = new Map<string, Map<number, RunResult>>();
 
-  for (const variant of VARIANTS) {
+  for (const variant of selected) {
     restore(saved);
     variant.apply();
     const results = new Map<number, RunResult>();
@@ -483,7 +489,7 @@ function runExperiments(runs: number, seed: number): void {
   );
   lines.push('| :--- | ---: | ---: | ---: | ---: | ---: | :--- | :--- |');
 
-  for (const variant of VARIANTS) {
+  for (const variant of selected) {
     if (variant.name === 'baseline') continue;
     const results = byVariant.get(variant.name);
     if (results === undefined) continue;
@@ -524,7 +530,7 @@ function runExperiments(runs: number, seed: number): void {
   lines.push('A confidence interval spanning zero means the data cannot tell the');
   lines.push('variant apart from the baseline — not that the change does nothing.');
   lines.push('');
-  for (const variant of VARIANTS) {
+  for (const variant of selected) {
     lines.push(`- **${variant.name}** — ${variant.rationale}`);
   }
   lines.push('');
@@ -533,10 +539,10 @@ function runExperiments(runs: number, seed: number): void {
 }
 
 function main(): void {
-  const { runs, write, seed, trace, experiments } = parseArgs(process.argv.slice(2));
+  const { runs, write, seed, trace, experiments, only } = parseArgs(process.argv.slice(2));
 
   if (experiments) {
-    runExperiments(runs, seed);
+    runExperiments(runs, seed, only);
     return;
   }
 
