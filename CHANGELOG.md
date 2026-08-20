@@ -8,6 +8,12 @@ Notable changes to this project. Format based on
 
 ### Added
 
+- **Replays.** A run is recorded as its seed plus the quantised intent stream
+  and re-simulates on playback, so a full run is a few kilobytes rather than a
+  video. Watchable from the title screen or the death screen, and copyable to
+  the clipboard as text. A 23-second run measures 2.85 KB; a synthetic
+  worst-case five-minute run, 36.5 KB (11.1 KB gzipped).
+
 - ESLint (type-aware) and Prettier, wired into CI and a single `npm run verify`.
 - Contributor workflow: PR template, structured issue forms, contributing guide,
   code of conduct, and security policy.
@@ -16,6 +22,10 @@ Notable changes to this project. Format based on
 
 ### Changed
 
+- `PlayerIntent` now carries an aim **angle** rather than a screen point. The
+  simulation only ever needed the direction, and an angle is the same shape
+  whether it came from a mouse, a thumbstick or a recording — which is what
+  makes an intent finitely quantisable.
 - Pinned TypeScript to 5.9. TypeScript 7 compiles the project, but
   `typescript-eslint` does not yet support it, and a toolchain where the linter
   cannot run is not worth the newer compiler.

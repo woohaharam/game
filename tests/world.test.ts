@@ -25,8 +25,7 @@ function makeWorld(seed: number): World {
 
 const IDLE: PlayerIntent = {
   move: { x: 0, y: 0 },
-  aimX: 0,
-  aimY: 0,
+  aimAngle: 0,
   firing: false,
   dashPressed: false,
 };
@@ -52,8 +51,7 @@ function botIntent(world: World): PlayerIntent {
   const strafe = angle + Math.PI / 2;
   return {
     move: { x: Math.cos(strafe), y: Math.sin(strafe) },
-    aimX: targetX,
-    aimY: targetY,
+    aimAngle: angle,
     firing: bestDistance < Number.POSITIVE_INFINITY,
     dashPressed: false,
   };

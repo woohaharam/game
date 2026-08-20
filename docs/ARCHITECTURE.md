@@ -250,7 +250,89 @@ Browsers refuse to create an `AudioContext` before a user gesture, so the bus is
 created lazily on first interaction and every call is a silent no-op until then.
 That is also why `AudioBus` is safe to construct in a Node test.
 
-## 12. Game feel
+## 12. Replays
+
+`src/game/replay/`
+
+The simulation is deterministic from a seed, so a run is fully described by
+that seed plus the sequence of intents the player fed it. A replay is therefore
+a recording of _decisions_, not of frames: it re-simulates rather than plays
+back, which means it stays correct at any resolution and is a few kilobytes
+instead of a video.
+
+It also turns the determinism claim into something demonstrable. "The RNG is
+seeded" is a sentence; "here is your run, re-derived from 2.8 KB" is a
+demonstration.
+
+### The ordering that makes it work
+
+Intents are quantised **before** the simulation sees them:
+
+```
+input → quantise → world.update()
+              ↘ recorder
+```
+
+The world only ever consumes values that survive a round-trip through the
+recording format, so a replay cannot drift from the run it recorded. Quantising
+afterwards would be lossy and the two would diverge — slowly at first, then
+completely.
+
+Aim is stored at 1/1024 of a turn (0.35°), chosen against the weapon rather
+than the display: base spread is ±2.6°, so a third of a degree is already below
+the noise floor of the shot itself.
+
+### Size
+
+Three things keep it small, in order of how much they buy:
+
+1. **Change-only frames.** Input is held far more often than it changes, so only
+   ticks where the quantised intent differs are stored.
+2. **A packed header byte.** Four flag bits plus four bits of tick delta, since
+   consecutive frames are the overwhelmingly common case. This removed roughly a
+   byte from every frame.
+3. **Delta-coded aim.** A mouse moves in small increments; the change in angle
+   fits in one byte where the absolute value needs two.
+
+Measured on synthetic worst-case input — keyboard movement plus continuously
+moving mouse aim, so nearly every tick stores a frame:
+
+| Run length |  Ticks | Frames | Encoded | Gzipped |
+| ---------- | -----: | -----: | ------: | ------: |
+| 1 min      |  3,600 |  3,578 |  7.3 KB |  2.6 KB |
+| 3 min      | 10,800 | 10,741 | 21.9 KB |  7.0 KB |
+| 5 min      | 18,000 | 17,899 | 36.5 KB | 11.1 KB |
+
+A real 23-second run recorded in the browser came to 2.85 KB.
+
+### What had to be recorded beyond movement
+
+Upgrade picks. Everything else a player does reaches the world through the
+intent stream, but choosing one of three cards is a decision made in an overlay
+while the simulation is paused, so choices are stored as `(tick, upgradeId)`
+events and applied during playback in place of showing the picker.
+
+The roll itself still happens in both modes. It draws from the gameplay RNG, so
+skipping it during playback would desynchronise every later draw — only the
+_picking_ differs.
+
+### Testing it
+
+`tests/replay.test.ts` records a scripted run, replays the recording into a
+fresh world, and compares a fingerprint of the entire end state — player
+position and velocity to six decimals, every live enemy's health, position and
+FSM state, score, coins, and the upgrade list. Across five seeds, and again
+after a binary and a base64 round-trip.
+
+Verified in a real browser too, driving the actual mouse and keyboard path
+rather than synthetic intents. The first attempt reported a divergence of
+exactly one aim quantum, which turned out to be the harness: the live
+fingerprint and the tick counter were read while the loop was still running, so
+they described different ticks. Freezing the loop before reading made them
+identical. Worth recording because a one-quantum difference looks exactly like
+a real quantisation bug.
+
+## 13. Game feel
 
 `src/game/config.ts` (the `FEEL` block)
 
@@ -285,4 +367,4 @@ Being straight about what is not here:
   harness could drive automated balance runs; that work has not been done.
 - **The boss is one archetype re-skinned by depth**, with scaling health and an
   extra spiral arm per phase. Distinct bosses per floor would be better.
-- **No run history or leaderboard.** Only a best score persists.
+- **No leaderboard.** Replays are kept locally — the last run and the best-scoring one — and can be copied out as text, but there is nowhere to submit them.

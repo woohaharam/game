@@ -5,6 +5,8 @@ import { ParticleSystem } from '@engine/particles';
 import { UI } from '@game/render/theme';
 import { profileStore } from '@game/save-data';
 import { GameScene } from './game-scene';
+import { loadBestReplay, loadLastReplay } from '@game/replay/storage';
+import type { ReplayData } from '@game/replay/format';
 
 /**
  * Title screen.
@@ -27,10 +29,14 @@ export class MenuScene implements Scene {
   private particles!: ParticleSystem;
   private rng = new Rng(Date.now() >>> 0);
   private keyHandler: ((event: KeyboardEvent) => void) | null = null;
+  private lastReplay: ReplayData | null = null;
+  private bestReplay: ReplayData | null = null;
 
   enter(context: SceneContext): void {
     this.particles = new ParticleSystem(this.rng, 240);
     this.seedText = profileStore.value.lastSeed;
+    this.lastReplay = loadLastReplay();
+    this.bestReplay = loadBestReplay();
     context.renderer.lowQuality = profileStore.value.lowQuality;
     if (profileStore.value.muted !== context.audio.muted) context.audio.toggleMute();
 
@@ -91,6 +97,16 @@ export class MenuScene implements Scene {
         this.start(context);
         return;
       }
+    }
+
+    // Watching a run needs no seed entry and no decision, so it gets a single
+    // key rather than a menu.
+    const replay = this.bestReplay ?? this.lastReplay;
+    if (replay !== null && input.wasPressed('up')) {
+      audio.unlock();
+      audio.play('uiSelect');
+      context.stack.replaceAll(new GameScene(replay.seed, replay));
+      return;
     }
 
     void stack;
@@ -203,6 +219,17 @@ export class MenuScene implements Scene {
       height * 0.78,
       { size: 12, color: UI.textDim, align: 'center', letterSpacing: '2px' },
     );
+
+    const replay = this.bestReplay ?? this.lastReplay;
+    if (replay !== null) {
+      const label = this.bestReplay !== null ? 'BEST RUN' : 'LAST RUN';
+      renderer.text(
+        `▶  ↑  WATCH ${label} — ${replay.meta.score.toLocaleString()} pts, floor ${replay.meta.depth}`,
+        width / 2,
+        height * 0.72,
+        { size: 12, color: UI.coin, align: 'center', letterSpacing: '1px' },
+      );
+    }
 
     const controls = [
       'WASD / ARROWS  move',
