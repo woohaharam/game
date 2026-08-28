@@ -130,3 +130,19 @@ export function floorProgress(state: GameState): number {
   if (state.fightingGuardian) return 1;
   return Math.min(1, state.killsOnFloor / KILLS_PER_FLOOR);
 }
+
+/**
+ * A deep copy, for asking "what would happen if…" without it happening.
+ *
+ * Written by hand rather than with `structuredClone`, which cannot carry the
+ * Decimal instances across. Decimals are immutable, so they are shared rather
+ * than copied — that is the point of making them immutable.
+ */
+export function cloneState(state: GameState): GameState {
+  return {
+    ...state,
+    upgrades: { ...state.upgrades },
+    companions: { ...state.companions },
+    stats: { ...state.stats },
+  };
+}
