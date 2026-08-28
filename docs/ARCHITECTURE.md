@@ -425,12 +425,62 @@ one of them is a statement about the game rather than the bot.
 Roughly 45% of runs still stall. That is the harness's main limitation and it
 is stated at the top of every report.
 
-### What it found
+### What it found, and what it cost to believe it
 
-The generated report lives at [`BALANCE.md`](BALANCE.md). The most useful thing
-it surfaced immediately: **floor 2 is where runs end.** 74% of runs clear floor
-1, and only 36% clear floor 2 — a much sharper step than any other floor
-transition, and not something that was visible from playing.
+The generated report lives at [`BALANCE.md`](BALANCE.md). The first thing it
+surfaced was that **floor 2 is where runs end**: about three quarters of runs
+cleared floor 1 and about 40% cleared floor 2 — a much sharper step than any
+other transition, and not visible from playing.
+
+Finding the _cause_ took three attempts, each thrown out by its own data.
+
+**Attempt 1 — unpaired comparison. Wrong answer.** Candidate changes were
+compared on aggregate clear rate. With ~90 runs reaching floor 2, the 95%
+interval on a 40% rate is about ±10 points, so nothing was distinguishable.
+Worse, it pointed backwards: softening the room budget looked _worse_ (37.0%
+against 39.1%).
+
+**Attempt 2 — pairing. Readable, but the wrong conclusion.** Every variant
+already ran the identical seed list, so the runs were paired all along.
+Comparing each seed against itself removes the variance between dungeons, which
+had been swamping the effect. Suddenly the budget change was the one
+"significant" result — the exact opposite of the unpaired reading, from the same
+data.
+
+That should have been suspicious, and a dose-response check made it so: the
+response was not monotonic (1.35 → +0.153, 1.15 → +0.094, 0.9 → +0.211). A real
+lever does not behave that way.
+
+**Attempt 3 — a metric that can see.** Integer floor reached tied on roughly
+60% of paired seeds. Dying two rooms into floor 3 and dying one room short of
+its boss are very different outcomes that "reached floor 3" cannot separate.
+Scoring on completed floors _plus the fraction of the current floor cleared_
+recovered that discarded signal — and the budget effect vanished entirely, all
+three doses indistinguishable from zero. It had been an artefact of the coarse
+metric the whole time.
+
+What survived, over 500 paired seeds:
+
+| Variant                      |   Mean Δprogress | 95% CI           |                |
+| :--------------------------- | ---------------: | :--------------- | :------------- |
+| stagger archetype unlocks    |           +0.159 | +0.022 to +0.296 | **detectable** |
+| soften enemy health          |           +0.130 | +0.006 to +0.253 | **detectable** |
+| soften boss health           |           +0.114 | -0.025 to +0.254 | —              |
+| soften room budget (3 doses) | -0.025 to +0.071 | all span zero    | —              |
+
+**No single number was mis-tuned.** Four things escalate at once on the floor-1
+to floor-2 transition — room budget up 46%, enemy health up 22%, boss health up
+35%, and _two_ new archetypes unlocking simultaneously — and each contributes
+about a tenth of a floor.
+
+The change that shipped is the one with both a measurable effect and a reason
+rather than a number: bomber, turret and brute now unlock on floors 2, 3 and 4
+instead of 2, 2 and 3, so a player meets one new enemy per floor. Floor-2 clear
+rate moved from 40.9% to 49.8%, and the step softened without displacing to
+floor 3, which also improved.
+
+It did not _eliminate_ the step — floor 1 still clears at 76% against floor 2's
+50%. That is an honest result, not a solved problem.
 
 ## 14. Game feel
 

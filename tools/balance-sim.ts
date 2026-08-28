@@ -17,9 +17,11 @@
  * thing that ships.
  *
  * Usage:
- *   npm run balance                 # 300 runs, default settings
- *   npm run balance -- --runs 2000  # more samples, tighter intervals
- *   npm run balance -- --write      # also update docs/BALANCE.md
+ *   npm run balance                    # 300 runs, default settings
+ *   npm run balance -- --runs 2000     # more samples, tighter intervals
+ *   npm run balance -- --write         # also update docs/BALANCE.md
+ *   npm run balance -- --trace 42      # narrate a single run
+ *   npm run balance -- --experiments   # A/B candidate tuning changes
  */
 import { writeFileSync } from 'node:fs';
 import { AudioBus } from '@engine/audio';
@@ -30,6 +32,7 @@ import { rollChoices } from '@game/progression/upgrades';
 import type { EnemyKind } from '@game/config';
 import type { Enemy } from '@game/entities/enemy';
 import { Bot, DEFAULT_BOT } from './bot';
+import { VARIANTS, restore, snapshot } from './experiments';
 
 const TICK = 1 / 60;
 /** Hard ceiling per run so a stuck bot cannot hang the sweep. */
@@ -44,6 +47,16 @@ interface RunResult {
   kills: number;
   roomsCleared: number;
   ticks: number;
+  /**
+   * Continuous progress: completed floors plus the fraction of the current
+   * floor cleared.
+   *
+   * Integer floor count is far too coarse to compare tuning changes — it tied
+   * on roughly 60% of paired seeds, discarding most of the signal. Dying two
+   * rooms into floor 3 and dying one room short of its boss are very different
+   * outcomes that "reached floor 3" cannot tell apart.
+   */
+  progress: number;
   died: boolean;
   stalled: boolean;
   /** Why the run was abandoned, when it was. */
@@ -67,6 +80,7 @@ function simulateRun(seed: number, trace = false): RunResult {
     kills: 0,
     roomsCleared: 0,
     ticks: 0,
+    progress: 0,
     died: false,
     stalled: false,
     stallReason: '',
@@ -158,6 +172,11 @@ function simulateRun(seed: number, trace = false): RunResult {
       break;
     }
   }
+
+  const rooms = world.dungeon.rooms;
+  const clearedFraction =
+    rooms.length === 0 ? 0 : rooms.filter((r) => r.cleared).length / rooms.length;
+  result.progress = world.run.depth - 1 + clearedFraction;
 
   result.depth = world.run.depth;
   result.score = world.run.score;
@@ -393,23 +412,139 @@ function parseArgs(argv: readonly string[]): {
   write: boolean;
   seed: number;
   trace: number | null;
+  experiments: boolean;
+  only: string | null;
 } {
   let runs = 300;
   let write = false;
   let seed = 1;
   let trace: number | null = null;
+  let experiments = false;
+  let only: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--runs') runs = Number(argv[++i]) || runs;
     else if (arg === '--seed') seed = Number(argv[++i]) || seed;
     else if (arg === '--trace') trace = Number(argv[++i]);
     else if (arg === '--write') write = true;
+    else if (arg === '--experiments') experiments = true;
+    else if (arg === '--only') only = argv[++i] ?? null;
   }
-  return { runs, write, seed, trace };
+  return { runs, write, seed, trace, experiments, only };
+}
+
+/**
+ * Runs each candidate tuning change over the same seeds and compares them
+ * **pairwise** against the baseline.
+ *
+ * The first version of this compared aggregate clear rates, which was
+ * underpowered to the point of uselessness: with ~90 runs reaching floor 2, the
+ * 95% interval on a 40% rate is about ±10 points, so the largest observed
+ * difference (+7 points) could not be told from noise.
+ *
+ * Because every variant runs the identical seed list, the runs are *paired* —
+ * same dungeon, same spawns, same bot decisions, one rule changed. Comparing
+ * seed against itself removes the variance between dungeons, which was
+ * swamping the effect being measured. The same data then answers the question
+ * several times more precisely.
+ */
+function runExperiments(runs: number, seed: number, only: string | null): void {
+  const saved = snapshot();
+  // `--only` narrows the sweep to one variant plus the baseline, so a specific
+  // question can be answered with many more seeds in the same wall-clock time.
+  const selected = VARIANTS.filter((v) => only === null || v.name === only || v.name === 'baseline');
+
+  // depth reached per seed, per variant
+  const byVariant = new Map<string, Map<number, RunResult>>();
+
+  for (const variant of selected) {
+    restore(saved);
+    variant.apply();
+    const results = new Map<number, RunResult>();
+    for (let i = 0; i < runs; i++) {
+      const runSeed = seed + i;
+      results.set(runSeed, simulateRun(runSeed));
+    }
+    byVariant.set(variant.name, results);
+    process.stdout.write(`  ${variant.name} done\n`);
+  }
+  restore(saved);
+
+  const baseline = byVariant.get('baseline');
+  if (baseline === undefined) return;
+
+  const lines: string[] = [];
+  lines.push('# Balance experiments');
+  lines.push('');
+  lines.push(
+    `${runs} seeds per variant, identical across variants. Every comparison is ` +
+      'paired — same dungeon, same spawns, one rule changed — and scored on ' +
+      'continuous progress (floors completed plus the fraction of the current ' +
+      'floor cleared) rather than on integer floor count, which tied too often ' +
+      'to be informative.',
+  );
+  lines.push('');
+  lines.push(
+    '| Variant | Paired seeds | Better | Worse | Tied | Mean Δprogress | 95% CI | Verdict |',
+  );
+  lines.push('| :--- | ---: | ---: | ---: | ---: | ---: | :--- | :--- |');
+
+  for (const variant of selected) {
+    if (variant.name === 'baseline') continue;
+    const results = byVariant.get(variant.name);
+    if (results === undefined) continue;
+
+    const deltas: number[] = [];
+    let deeper = 0;
+    let shallower = 0;
+    let same = 0;
+
+    for (const [runSeed, base] of baseline) {
+      const other = results.get(runSeed);
+      // Only seeds where *both* arms produced a usable run can be paired.
+      if (other === undefined || base.stalled || other.stalled) continue;
+      const delta = other.progress - base.progress;
+      deltas.push(delta);
+      if (delta > 0) deeper++;
+      else if (delta < 0) shallower++;
+      else same++;
+    }
+
+    const n = deltas.length;
+    const m = mean(deltas);
+    // Standard error of the paired mean difference.
+    const se = n > 1 ? stdev(deltas) / Math.sqrt(n) : 0;
+    const low = m - 1.96 * se;
+    const high = m + 1.96 * se;
+    const significant = low > 0 || high < 0;
+    const verdict = !significant ? 'no detectable effect' : m > 0 ? '**easier**' : '**harder**';
+
+    lines.push(
+      `| ${variant.name} | ${n} | ${deeper} | ${shallower} | ${same} | ` +
+        `${m >= 0 ? '+' : ''}${m.toFixed(3)} | ` +
+        `${low >= 0 ? '+' : ''}${low.toFixed(3)} to ${high >= 0 ? '+' : ''}${high.toFixed(3)} | ${verdict} |`,
+    );
+  }
+
+  lines.push('');
+  lines.push('A confidence interval spanning zero means the data cannot tell the');
+  lines.push('variant apart from the baseline — not that the change does nothing.');
+  lines.push('');
+  for (const variant of selected) {
+    lines.push(`- **${variant.name}** — ${variant.rationale}`);
+  }
+  lines.push('');
+
+  process.stdout.write(`\n${lines.join('\n')}\n`);
 }
 
 function main(): void {
-  const { runs, write, seed, trace } = parseArgs(process.argv.slice(2));
+  const { runs, write, seed, trace, experiments, only } = parseArgs(process.argv.slice(2));
+
+  if (experiments) {
+    runExperiments(runs, seed, only);
+    return;
+  }
 
   // `--trace <seed>` narrates a single run. Balance questions are usually
   // "why did this one end like that", and a table cannot answer it.

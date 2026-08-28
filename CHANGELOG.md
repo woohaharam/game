@@ -30,6 +30,13 @@ Notable changes to this project. Format based on
 
 ### Changed
 
+- **Enemy archetypes now unlock one per floor.** Bomber, turret and brute
+  arrive on floors 2, 3 and 4 instead of 2, 2 and 3 — a player who learned two
+  enemies on floor 1 previously met four on floor 2, while room budget, enemy
+  health and boss health all rose at the same time. Measured over 500 paired
+  seeds: +0.159 floors of progress (95% CI +0.022 to +0.296), floor-2 clear
+  rate 40.9% → 49.8%.
+
 - **Simulation numerics changed slightly.** `Math.hypot` was replaced with
   `sqrt(x*x + y*y)`, which is exactly specified and 13.6× faster but not
   bit-identical. A given seed therefore plays out slightly differently than in

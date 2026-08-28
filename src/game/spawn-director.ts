@@ -20,19 +20,29 @@ export interface SpawnPlan {
   budget: number;
 }
 
-interface Weight {
+export interface Weight {
   kind: EnemyKind;
   weight: number;
   /** Not offered before this floor. */
   minDepth: number;
 }
 
-const TABLE: readonly Weight[] = [
+/**
+ * Exported so the balance tooling can experiment with unlock depths without
+ * editing this file. Nothing in the game mutates it.
+ */
+export const SPAWN_TABLE: readonly Weight[] = [
+  // One new archetype per floor, deliberately. Bomber and turret both used to
+  // unlock on floor 2, so a player who had learned two enemies on floor 1 met
+  // four on floor 2 — while the room budget, enemy health and boss health all
+  // rose at the same time. Simulated over 500 paired seeds, spreading them out
+  // is the only lever with both a measurable effect and a reason: +0.159 floors
+  // of progress (95% CI +0.022 to +0.296). See docs/BALANCE.md.
   { kind: 'grunt', weight: 10, minDepth: 1 },
   { kind: 'shooter', weight: 7, minDepth: 1 },
   { kind: 'bomber', weight: 5, minDepth: 2 },
-  { kind: 'turret', weight: 4, minDepth: 2 },
-  { kind: 'brute', weight: 3, minDepth: 3 },
+  { kind: 'turret', weight: 4, minDepth: 3 },
+  { kind: 'brute', weight: 3, minDepth: 4 },
 ];
 
 export function budgetFor(depth: number, roomType: RoomType): number {
@@ -49,7 +59,7 @@ export function budgetFor(depth: number, roomType: RoomType): number {
  */
 export function planSpawns(rng: Rng, depth: number, roomType: RoomType): SpawnPlan {
   const budget = budgetFor(depth, roomType);
-  const available = TABLE.filter((entry) => entry.minDepth <= depth);
+  const available = SPAWN_TABLE.filter((entry) => entry.minDepth <= depth);
   const kinds: EnemyKind[] = [];
 
   let remaining = budget;
