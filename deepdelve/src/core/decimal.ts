@@ -115,6 +115,27 @@ export class Decimal {
     return this.mantissa * 10 ** this.exponent;
   }
 
+  /**
+   * Discards any fractional part.
+   *
+   * Above 15 decades every representable value is already a whole number — the
+   * mantissa has run out of digits to spend on a fraction — so the value is
+   * returned untouched rather than routed through a double it would not
+   * survive.
+   */
+  floorToInteger(): Decimal {
+    if (this.isZero || this.exponent >= 15) return this;
+
+    const value = this.toNumber();
+    // `mantissa * 10 ** exponent` is not exact: 4.06e3 collapses to
+    // 4059.9999999999995, and flooring that loses a whole unit. Anything within
+    // floating-point noise of an integer was that integer before the round trip.
+    const nearest = Math.round(value);
+    if (Math.abs(value - nearest) <= Math.abs(value) * 1e-12) return Decimal.from(nearest);
+
+    return Decimal.from(Math.floor(value));
+  }
+
   /** Base-10 logarithm. Negative and zero values return `-Infinity`. */
   log10(): number {
     if (this.mantissa <= 0) return -Infinity;
