@@ -22,7 +22,17 @@ const BOSS_HEALTH_FACTOR = 14;
 /** And this many in gold, so a floor clear feels like an event. */
 const BOSS_GOLD_FACTOR = 9;
 
-const BASE_HEALTH = 10;
+/**
+ * Floor 1 is tuned so the very first monster dies in about two seconds.
+ *
+ * Measured in a browser: at the original 10 health against a starting 1.05
+ * damage per second, the opening nine and a half seconds of the game showed a
+ * health bar moving and nothing else — no kill, no gold, no reason to stay. A
+ * portal player decides in less time than that. Floor 1's guardian still falls
+ * just inside its timer without a purchase, so the first floor clears itself and
+ * the second one is where the shop starts to matter.
+ */
+const BASE_HEALTH = 6;
 const HEALTH_GROWTH = 1.55;
 
 const BASE_GOLD = 4;

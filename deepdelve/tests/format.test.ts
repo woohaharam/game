@@ -42,6 +42,14 @@ describe('formatNumber', () => {
     expect(formatNumber(d(999))).toBe('999');
   });
 
+  it('does not put a decimal point on a whole number', () => {
+    // These are counts as often as they are quantities, and "2.0 kills" reads
+    // like a bug rather than a number.
+    expect(formatNumber(d(2))).toBe('2');
+    expect(formatNumber(d(0))).toBe('0');
+    expect(formatNumber(d(42))).toBe('42');
+  });
+
   it('switches to suffixes at a thousand', () => {
     expect(formatNumber(d(1000))).toBe('1.00K');
     expect(formatNumber(d(1500))).toBe('1.50K');

@@ -1,0 +1,516 @@
+/*
+ * Phone-first, because portal traffic is overwhelmingly phones.
+ *
+ * One column, 44px minimum touch targets, and no hover-only affordances. The
+ * palette is deliberately narrow — two warm accents against a cold stone
+ * ground — so that the one thing that changes colour (an affordable purchase)
+ * is the thing the eye goes to.
+ */
+
+:root {
+  --stone-900: #0e0d13;
+  --stone-800: #16151d;
+  --stone-700: #1f1d29;
+  --stone-600: #2b2838;
+  --stone-500: #423d56;
+  --ink: #e8e4f0;
+  --ink-dim: #9b93b3;
+  --gold: #f0c04a;
+  --relic: #7fd4e8;
+  --blood: #c8434b;
+  --heal: #5fbf6a;
+  --radius: 12px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * The `hidden` attribute is only a UA-stylesheet `display: none`, so any rule
+ * that sets an explicit display — every `.panel` and `.row` here — silently
+ * beats it and the element stays on screen. Setting `.hidden = true` in script
+ * then appears to work while changing nothing, which is exactly the kind of bug
+ * a DOM-property assertion cannot see.
+ */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--stone-900);
+  color: var(--ink);
+  font: 15px/1.45 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100%;
+  background: var(--stone-800);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--stone-600);
+  padding: 10px 14px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms ease, transform 60ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* -- top bar ------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--stone-900);
+  border-bottom: 1px solid var(--stone-700);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.purse {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.purse .coin {
+  color: var(--gold);
+}
+
+.purse.relics .coin {
+  color: var(--relic);
+}
+
+.purse em {
+  color: var(--relic);
+  font-style: normal;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* -- combat -------------------------------------------------------------- */
+
+.combat {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.floorline {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-dim);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.stage {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 14px;
+  border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 30%, var(--stone-600), var(--stone-700) 70%);
+  border: 1px solid var(--stone-600);
+}
+
+.stage.guardian {
+  border-color: var(--blood);
+  background: radial-gradient(circle at 50% 30%, #3a2230, var(--stone-700) 70%);
+}
+
+.sprite {
+  font-size: 52px;
+  line-height: 1;
+  /* Idle breathing, so a game that is mostly waiting never looks frozen. */
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite {
+    animation: none;
+  }
+}
+
+.enemy-name {
+  font-weight: 600;
+}
+
+.healthbar,
+.killbar {
+  position: relative;
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--stone-900);
+  overflow: hidden;
+}
+
+.healthbar .fill,
+.killbar .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 100%);
+  background: linear-gradient(90deg, #8e2f38, var(--blood));
+  /* Short, so the bar tracks the number rather than trailing behind it. */
+  transition: width 90ms linear;
+}
+
+.killbar {
+  height: 8px;
+}
+
+.killbar .fill {
+  background: linear-gradient(90deg, #3f8f4a, var(--heal));
+}
+
+.bartext {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px #000;
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.timer.urgent {
+  color: var(--blood);
+  font-weight: 700;
+}
+
+.progressline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.killtext {
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.readout {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.readout strong {
+  color: var(--ink);
+}
+
+.blessing {
+  color: var(--gold);
+}
+
+.boosts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button.ad {
+  background: linear-gradient(180deg, #4a3a12, #33270c);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* -- tabs ---------------------------------------------------------------- */
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 0 14px;
+  background: var(--stone-800);
+  position: sticky;
+  top: 45px;
+  z-index: 4;
+}
+
+.tab {
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--stone-700);
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+.tab.active {
+  background: var(--stone-600);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.panel {
+  padding: 12px 14px 24px;
+  display: grid;
+  gap: 10px;
+  flex: 1;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.lock {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+/* -- shop rows ----------------------------------------------------------- */
+
+.qty-select {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.qty-option {
+  background: var(--stone-700);
+  color: var(--ink-dim);
+  font-size: 13px;
+  min-height: 38px;
+}
+
+.qty-option.active {
+  background: var(--stone-500);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.rows {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--stone-700);
+  border: 1px solid transparent;
+}
+
+.row.affordable {
+  border-color: var(--stone-500);
+}
+
+.row .icon {
+  font-size: 24px;
+}
+
+.row .name {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.row .level {
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.row .desc {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+button.buy {
+  min-width: 96px;
+  background: var(--stone-600);
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row.affordable button.buy {
+  background: linear-gradient(180deg, #3d3350, #2b2438);
+}
+
+.qty {
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+
+/* -- descend ------------------------------------------------------------- */
+
+.descend-card,
+.stats-card {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--stone-700);
+  display: grid;
+  gap: 10px;
+}
+
+.descend-card h2,
+.stats-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.relic-preview {
+  font-size: 28px;
+  color: var(--relic);
+  font-variant-numeric: tabular-nums;
+}
+
+.relic-preview span {
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+button.descend {
+  background: linear-gradient(180deg, #1d4a56, #14323a);
+  border: 1px solid var(--relic);
+  color: var(--relic);
+  font-weight: 700;
+}
+
+.stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.stats dt {
+  color: var(--ink-dim);
+}
+
+.stats dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button.quiet {
+  background: var(--stone-700);
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+button.danger {
+  background: var(--stone-700);
+  color: var(--blood);
+  font-size: 13px;
+}
+
+/* -- modal --------------------------------------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(6 5 10 / 78%);
+  z-index: 10;
+}
+
+.modal {
+  width: 100%;
+  max-width: 360px;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--stone-700);
+  border: 1px solid var(--stone-500);
+  display: grid;
+  gap: 12px;
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.away {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.modal-actions {
+  display: grid;
+  gap: 8px;
+}
+
+button.primary {
+  background: var(--stone-500);
+  font-weight: 600;
+}

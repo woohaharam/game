@@ -16,8 +16,13 @@ import { Decimal } from '@core/decimal';
 import { COMPANIONS, type CompanionId } from './content/companions';
 import { type UpgradeId } from './content/upgrades';
 
-/** What the hero starts with, before a single purchase. */
-const BASE_DAMAGE = 1;
+/**
+ * What the hero starts with, before a single purchase.
+ *
+ * Base damage is 3 rather than 1 for the sake of the opening seconds; see the
+ * note on floor 1's health in `content/floors.ts`.
+ */
+const BASE_DAMAGE = 3;
 const BASE_STRIKES_PER_SECOND = 1;
 const BASE_CRIT_CHANCE = 0.05;
 const BASE_CRIT_MULTIPLIER = 2;

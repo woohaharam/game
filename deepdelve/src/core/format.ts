@@ -87,6 +87,9 @@ export function formatNumber(value: Decimal | number, options: FormatOptions = {
   // them rather than rounding 999 to "1.00K".
   if (decimal.exponent < 3) {
     const n = decimal.toNumber();
+    // Counts are numbers too. "2.0 guardians felled" reads like a rounding
+    // error, so anything already whole is printed whole.
+    if (Number.isInteger(n)) return String(n);
     if (n < 10) return truncate(n, n < 1 ? 3 : 1);
     return String(Math.floor(n));
   }

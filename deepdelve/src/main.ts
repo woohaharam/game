@@ -1,0 +1,177 @@
+/**
+ * Boot, loop, and the wiring between the game and the page it lives on.
+ *
+ * The interesting problems here are all about time. A browser tab does not run
+ * while it is in the background: `requestAnimationFrame` simply stops, and when
+ * the tab comes back the first frame reports an enormous delta that would
+ * either be clamped away (losing the player's progress) or applied raw (letting
+ * anyone bank hours by tabbing away). Neither is acceptable, so the frame delta
+ * is only ever trusted for small values, and anything longer is reconciled
+ * against the wall clock through the same offline path a fresh page load uses.
+ */
+
+import './ui/styles.css';
+
+import { createStore } from '@core/storage';
+import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
+import { canDescend, descend } from '@game/prestige';
+import { grantBlessing, grantChest } from '@game/rewards';
+import { load, save, wipe } from '@game/save';
+import { advance } from '@game/simulation';
+import { detectAdProvider } from '@platform/portals';
+import { GameView } from '@ui/view';
+
+/**
+ * Longest frame delta trusted as a real frame.
+ *
+ * A dropped frame or a slow garbage collection can produce a few hundred
+ * milliseconds legitimately. Anything past a second means the tab was not
+ * running, and that time belongs to the offline path, which is capped and
+ * audited, rather than to the frame loop, which is neither.
+ */
+const MAX_FRAME_SECONDS = 1;
+
+/** Saving is cheap, but not free; ten seconds bounds a crash to ten seconds. */
+const AUTOSAVE_INTERVAL_MS = 10_000;
+
+/** Text updates are throttled; the simulation is not. */
+const RENDER_INTERVAL_MS = 1000 / 20;
+
+function boot(): void {
+  const root = document.querySelector<HTMLElement>('#app');
+  if (root === null) throw new Error('#app missing');
+
+  const store = createStore();
+  const loaded = load(store);
+  const state = loaded.state;
+
+  let paused = false;
+  const provider = detectAdProvider(globalThis, {
+    onAdStart: () => {
+      paused = true;
+      provider.gameplayStop();
+    },
+    onAdEnd: () => {
+      paused = false;
+      // The clock kept running behind the ad; hand that time to the offline
+      // path rather than to the next frame delta.
+      reconcile();
+      provider.gameplayStart();
+    },
+  });
+
+  let pendingOffline: OfflineResult | null = null;
+
+  const view = new GameView(root, state, {
+    onDescend: () => {
+      if (!canDescend(state)) return;
+      const confirmed = globalThis.confirm(
+        'Descend? This run’s gold, upgrades and companions are lost. Relics are kept.',
+      );
+      if (!confirmed) return;
+      descend(state);
+      save(store, state);
+      // A descent is the natural break in the session: the run just ended, and
+      // nothing is interrupted. It is the only place an interstitial belongs.
+      void provider.showInterstitial();
+    },
+    onWatchForBlessing: () => {
+      void provider.showRewarded('blessing').then((outcome) => {
+        if (outcome.granted) grantBlessing(state);
+      });
+    },
+    onWatchForChest: () => {
+      void provider.showRewarded('chest').then((outcome) => {
+        if (outcome.granted) grantChest(state);
+      });
+    },
+    onDismissOffline: () => {
+      pendingOffline = null;
+      view.hideOffline();
+    },
+    onDoubleOffline: () => {
+      const result = pendingOffline;
+      if (result === null) return;
+      void provider.showRewarded('offline-double').then((outcome) => {
+        if (!outcome.granted) return;
+        doubleOfflineEarnings(state, result);
+        view.markOfflineDoubled();
+      });
+    },
+    onWipe: () => {
+      if (!globalThis.confirm('Erase this save permanently?')) return;
+      wipe(store);
+      globalThis.location.reload();
+    },
+  });
+
+  view.setAdsAvailable(provider.rewardedAvailable());
+  view.mount();
+
+  /** Credits wall-clock time the frame loop could not have seen. */
+  function reconcile(): void {
+    const result = applyOfflineProgress(state);
+    if (!result.worthReporting) return;
+    pendingOffline = result;
+    view.showOffline({
+      awaySeconds: result.elapsedSeconds,
+      gold: result.report.goldEarned,
+      kills: result.report.kills,
+      floors: Math.max(0, result.report.endFloor - result.report.startFloor),
+      cappedOut: result.cappedOut,
+      canDouble: provider.rewardedAvailable(),
+    });
+  }
+
+  if (loaded.loaded) reconcile();
+  else state.lastSeen = Date.now();
+
+  let lastFrameAt = performance.now();
+  let lastRenderAt = 0;
+  let lastSaveAt = performance.now();
+
+  function frame(now: number): void {
+    requestAnimationFrame(frame);
+
+    const delta = (now - lastFrameAt) / 1000;
+    lastFrameAt = now;
+
+    if (!paused) {
+      // Anything longer than a frame means the tab was asleep. Dropping it here
+      // is safe because `reconcile` on the visibility change credits it in full.
+      if (delta > 0 && delta <= MAX_FRAME_SECONDS) advance(state, delta);
+    }
+
+    if (now - lastRenderAt >= RENDER_INTERVAL_MS) {
+      lastRenderAt = now;
+      view.update();
+    }
+
+    if (now - lastSaveAt >= AUTOSAVE_INTERVAL_MS) {
+      lastSaveAt = now;
+      save(store, state);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Stamp the save before the tab is frozen; `lastSeen` is what the offline
+      // path measures from, and a tab can be discarded without warning.
+      save(store, state);
+    } else {
+      lastFrameAt = performance.now();
+      reconcile();
+    }
+  });
+
+  // `pagehide` fires where `beforeunload` does not, notably on iOS.
+  globalThis.addEventListener('pagehide', () => {
+    save(store, state);
+  });
+
+  provider.loadingFinished();
+  provider.gameplayStart();
+  requestAnimationFrame(frame);
+}
+
+boot();
