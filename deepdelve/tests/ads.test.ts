@@ -57,13 +57,16 @@ describe('ad pacing', () => {
 
   it('refuses a second rewarded ad while one is open', async () => {
     const clock = new FakeClock();
-    let release: (() => void) | null = null;
+    // Held in an object rather than a `let`: the assignment happens inside a
+    // callback, which control-flow analysis cannot see, so a plain variable
+    // stays narrowed to null at the call below.
+    const gate: { release: () => void } = { release: () => {} };
     const inner: AdProvider = {
       name: 'slow',
       rewardedAvailable: () => true,
       showRewarded: () =>
         new Promise<RewardOutcome>((resolve) => {
-          release = () => resolve({ granted: true });
+          gate.release = () => resolve({ granted: true });
         }),
       showInterstitial: async () => {},
       gameplayStart() {},
@@ -77,7 +80,7 @@ describe('ad pacing', () => {
     const second = await paced.showRewarded('blessing');
     expect(second).toEqual({ granted: false, reason: 'throttled' });
 
-    release?.();
+    gate.release();
     expect(await first).toEqual({ granted: true });
   });
 
