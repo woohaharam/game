@@ -14,7 +14,7 @@
 
 import { Decimal } from './decimal';
 
-export type Notation = 'suffix' | 'scientific';
+export type Notation = 'suffix' | 'scientific' | 'korean';
 
 /**
  * Short scale, matching what English-language idle games have converged on.
@@ -33,6 +33,40 @@ const SHORT_SUFFIXES = [
   'Oc',
   'No',
   'Dc',
+] as const;
+
+/**
+ * Korean groups large numbers in fours, not threes.
+ *
+ * 만 is 10^4, 억 is 10^8, 조 is 10^12 — so the English K/M/B path, which splits
+ * every three digits, produces numbers a Korean reader has to stop and convert.
+ * Showing 1,234만 where the English build shows 12.34M is not a cosmetic
+ * preference; it is the difference between a number that is read and one that
+ * is decoded.
+ *
+ * The tail of this list (항하사 onwards) comes from the Buddhist series and is
+ * genuinely obscure, but an idle game reaches 10^52 within a day or two and the
+ * alternative there is bare scientific notation, which is worse.
+ */
+const KOREAN_UNITS = [
+  '',
+  '만',
+  '억',
+  '조',
+  '경',
+  '해',
+  '자',
+  '양',
+  '구',
+  '간',
+  '정',
+  '재',
+  '극',
+  '항하사',
+  '아승기',
+  '나유타',
+  '불가사의',
+  '무량대수',
 ] as const;
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
@@ -98,9 +132,34 @@ export function formatNumber(value: Decimal | number, options: FormatOptions = {
     return `${truncate(decimal.mantissa, places)}e${decimal.exponent}`;
   }
 
+  if (notation === 'korean') return formatKorean(decimal, places);
+
   const tier = Math.floor(decimal.exponent / 3);
   const withinTier = decimal.mantissa * 10 ** (decimal.exponent - tier * 3);
   return `${truncate(withinTier, places)}${suffixForTier(tier)}`;
+}
+
+/**
+ * Four-digit grouping with Korean unit names.
+ *
+ * The digit count is held at four significant figures rather than at a fixed
+ * number of decimals, so 1.234만, 12.34만, 123.4만 and 1234만 all occupy the
+ * same width. A column of numbers that changes width cannot be compared at a
+ * glance, and within a four-digit group the leading magnitude varies by three
+ * orders — far more than it does in the three-digit English path.
+ */
+function formatKorean(decimal: Decimal, places: number): string {
+  const tier = Math.floor(decimal.exponent / 4);
+  if (tier >= KOREAN_UNITS.length) {
+    // Past 무량대수 there is no name left to use, and inventing one would be
+    // less readable than the exponent itself.
+    return `${truncate(decimal.mantissa, places)}×10^${decimal.exponent}`;
+  }
+
+  const withinTier = decimal.mantissa * 10 ** (decimal.exponent - tier * 4);
+  const digitsBeforePoint = Math.max(1, Math.floor(Math.log10(withinTier)) + 1);
+  const decimals = Math.max(0, 4 - digitsBeforePoint);
+  return `${truncate(withinTier, decimals)}${KOREAN_UNITS[tier] ?? ''}`;
 }
 
 /** `formatNumber` with the decimals stripped, for tight spaces like buttons. */
@@ -108,9 +167,24 @@ export function formatCompact(value: Decimal | number, notation: Notation = 'suf
   return formatNumber(value, { notation, places: 1 });
 }
 
-/** Whole seconds into `1h 04m`, `3m 20s`, `12s`. Never shows a unit that is zero at the head. */
-export function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+export interface DurationUnits {
+  readonly day: string;
+  readonly hour: string;
+  readonly minute: string;
+  readonly second: string;
+}
+
+const ENGLISH_UNITS: DurationUnits = { day: 'd', hour: 'h', minute: 'm', second: 's' };
+
+/**
+ * Whole seconds into `1h 04m`, `3m 20s`, `12s`, never leading with a zero unit.
+ *
+ * Units are passed in rather than looked up, so this module stays free of any
+ * dependency on the locale layer; callers that want translated units supply
+ * them.
+ */
+export function formatDuration(seconds: number, units: DurationUnits = ENGLISH_UNITS): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return `0${units.second}`;
 
   const total = Math.floor(seconds);
   const days = Math.floor(total / 86_400);
@@ -119,10 +193,10 @@ export function formatDuration(seconds: number): string {
   const secs = total % 60;
 
   const pad = (n: number): string => String(n).padStart(2, '0');
-  if (days > 0) return `${days}d ${pad(hours)}h`;
-  if (hours > 0) return `${hours}h ${pad(minutes)}m`;
-  if (minutes > 0) return `${minutes}m ${pad(secs)}s`;
-  return `${secs}s`;
+  if (days > 0) return `${days}${units.day} ${pad(hours)}${units.hour}`;
+  if (hours > 0) return `${hours}${units.hour} ${pad(minutes)}${units.minute}`;
+  if (minutes > 0) return `${minutes}${units.minute} ${pad(secs)}${units.second}`;
+  return `${secs}${units.second}`;
 }
 
 /**

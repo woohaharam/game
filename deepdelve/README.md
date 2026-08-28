@@ -76,10 +76,36 @@ rendered geometry rather than DOM properties:
   nothing else — no kill, no gold, no reason to stay. A portal player decides in
   less time than that.
 
+## Korean, and what localisation actually costs
+
+The game ships in Korean and English, detected from `?lang=`, then the browser,
+with a toggle that persists outside the save — erasing a run should not drop a
+player back into a language they cannot read.
+
+The interesting part is not the string table. It is that **Korean groups large
+numbers in fours, not threes**: 만 is 10^4, 억 is 10^8, 조 is 10^12. Rendering
+12,345 as `12.34K` asks a Korean reader to stop and convert; `1.234만` is simply
+read. Within a Korean unit the magnitude spans three orders rather than two, so
+the formatter holds four *significant digits* instead of a fixed decimal count —
+1.234만, 12.34만, 123.4만, 1234만 — and names units as deep as Korean actually
+names them, through 극 (10^48) and the Buddhist series to 무량대수 (10^68),
+before falling back to an exponent.
+
+Two smaller things that are easy to miss: `word-break: keep-all`, because Korean
+otherwise breaks mid-word and a two-word phrase splits down its middle; and
+`system-ui` first in the font stack, so each platform reaches for its own Hangul
+face rather than a Latin font falling back to whatever has coverage.
+
+Content is translated rather than transliterated — 무덤쥐 and 잉걸불 심층, not
+phonetic renderings of "Crypt Rat" and "Ember Deep", which read as noise. Tests
+assert that the two key sets match exactly, that no Korean value passes English
+through, and that every `{placeholder}` survives translation, since a dropped
+one shows the player a sentence with a hole in it.
+
 ## Layout
 
 ```
-src/core/      Decimal, formatting, storage — no game knowledge
+src/core/      Decimal, formatting, i18n, storage — no game knowledge
 src/game/      simulation, state, content tables, saves, prestige
 src/platform/  ad providers and portal adapters
 src/ui/        the view: built once, updated in place

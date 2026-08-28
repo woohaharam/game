@@ -12,7 +12,8 @@
  */
 
 import { Decimal } from '@core/decimal';
-import { formatDuration, formatMultiplier, formatNumber, type Notation } from '@core/format';
+import { formatMultiplier, formatNumber, type Notation } from '@core/format';
+import { duration, getLocale, t, type Locale } from '@core/i18n';
 import {
   BOSS_TIME_LIMIT,
   KILLS_PER_FLOOR,
@@ -20,8 +21,13 @@ import {
   monsterName,
   zoneName,
 } from '@game/content/floors';
-import { COMPANIONS, type CompanionId } from '@game/content/companions';
-import { UPGRADES, type UpgradeId } from '@game/content/upgrades';
+import { COMPANIONS, companionName, type CompanionId } from '@game/content/companions';
+import {
+  UPGRADES,
+  upgradeDescription,
+  upgradeName,
+  type UpgradeId,
+} from '@game/content/upgrades';
 import { DESCENT_UNLOCK_FLOOR, canDescend, pendingRelics } from '@game/prestige';
 import { BLESSING_DURATION_SECONDS, chestValue } from '@game/rewards';
 import {
@@ -43,6 +49,8 @@ export type BuyQuantity = 1 | 10 | 'max';
 
 export interface ViewCallbacks {
   readonly onDescend: () => void;
+  /** The view cannot retranslate itself in place; the host rebuilds it. */
+  readonly onLanguageChange: (locale: Locale) => void;
   readonly onWatchForBlessing: () => void;
   readonly onWatchForChest: () => void;
   readonly onDismissOffline: () => void;
@@ -52,6 +60,8 @@ export interface ViewCallbacks {
 
 interface UpgradeRow {
   readonly root: HTMLElement;
+  readonly name: HTMLElement;
+  readonly description: HTMLElement;
   readonly level: HTMLElement;
   readonly cost: HTMLElement;
   readonly button: HTMLButtonElement;
@@ -71,6 +81,9 @@ export class GameView {
   private notation: Notation = 'suffix';
   private adsAvailable = false;
 
+  /** Set by the host so a notation change can be persisted. */
+  onNotationChange: ((notation: Notation) => void) | undefined;
+
   constructor(
     private readonly root: HTMLElement,
     private readonly state: GameState,
@@ -86,6 +99,22 @@ export class GameView {
   private track<T extends HTMLElement>(id: string, node: T): T {
     this.nodes.set(id, node);
     return node;
+  }
+
+  /**
+   * The parts of the view's own state worth carrying across a rebuild.
+   *
+   * A language switch discards the whole tree, and dropping the player back to
+   * the first tab with the quantity reset would make changing language feel
+   * like it reset something else too.
+   */
+  getUiState(): { readonly tab: Tab; readonly quantity: BuyQuantity } {
+    return { tab: this.tab, quantity: this.quantity };
+  }
+
+  restoreUiState(uiState: { readonly tab: Tab; readonly quantity: BuyQuantity }): void {
+    this.selectTab(uiState.tab);
+    this.selectQuantity(uiState.quantity);
   }
 
   setAdsAvailable(available: boolean): void {
@@ -168,9 +197,9 @@ export class GameView {
       ]),
 
       el('div', { class: 'readout' }, [
-        el('span', {}, ['Damage ']),
+        el('span', {}, [t('combat.damage')]),
         this.track('dps', el('strong', {}, ['0'])),
-        el('span', {}, [' / sec']),
+        el('span', {}, [t('combat.perSecond')]),
         this.track('blessing', el('span', { class: 'blessing' }, [''])),
       ]),
 
@@ -181,11 +210,11 @@ export class GameView {
   private buildBoosts(): HTMLElement {
     const blessing = this.track(
       'blessingButton',
-      el('button', { class: 'ad', type: 'button' }, ['▶ Blessing']),
+      el('button', { class: 'ad', type: 'button' }, ['']),
     );
     blessing.addEventListener('click', () => this.callbacks.onWatchForBlessing());
 
-    const chest = this.track('chestButton', el('button', { class: 'ad', type: 'button' }, ['▶ Chest']));
+    const chest = this.track('chestButton', el('button', { class: 'ad', type: 'button' }, ['']));
     chest.addEventListener('click', () => this.callbacks.onWatchForChest());
 
     return this.track('boosts', el('div', { class: 'boosts' }, [blessing, chest]));
@@ -193,9 +222,9 @@ export class GameView {
 
   private buildTabs(): HTMLElement {
     const labels: Record<Tab, string> = {
-      delve: 'Upgrades',
-      party: 'Party',
-      descend: 'Descend',
+      delve: t('tab.upgrades'),
+      party: t('tab.party'),
+      descend: t('tab.descend'),
     };
     return el(
       'nav',
@@ -211,29 +240,23 @@ export class GameView {
     );
   }
 
-  private buildShopRow(
-    key: string,
-    icon: string,
-    name: string,
-    description: string,
-    onBuy: () => void,
-  ): UpgradeRow {
-    const level = el('span', { class: 'level' }, ['Lv 0']);
+  private buildShopRow(key: string, icon: string, onBuy: () => void): UpgradeRow {
+    const level = el('span', { class: 'level' }, ['']);
     const cost = el('span', { class: 'cost' }, ['0']);
     const quantity = el('span', { class: 'qty' }, ['']);
     const button = el('button', { class: 'buy', type: 'button' }, [cost, quantity]);
     button.addEventListener('click', onBuy);
 
+    const name = el('span', { class: 'label' }, ['']);
+    const description = el('div', { class: 'desc' }, ['']);
+
     const root = el('div', { class: 'row', 'data-key': key }, [
       el('span', { class: 'icon' }, [icon]),
-      el('div', { class: 'about' }, [
-        el('div', { class: 'name' }, [name, level]),
-        el('div', { class: 'desc' }, [description]),
-      ]),
+      el('div', { class: 'about' }, [el('div', { class: 'name' }, [name, level]), description]),
       button,
     ]);
 
-    return { root, level, cost, button, quantity };
+    return { root, name, description, level, cost, button, quantity };
   }
 
   private buildDelvePanel(): HTMLElement {
@@ -245,7 +268,7 @@ export class GameView {
         const button = this.track(
           `qty-${String(amount)}`,
           el('button', { class: 'qty-option', type: 'button' }, [
-            amount === 'max' ? 'MAX' : `×${amount}`,
+            amount === 'max' ? t('shop.quantityMax') : `×${amount}`,
           ]),
         );
         button.addEventListener('click', () => this.selectQuantity(amount));
@@ -254,7 +277,7 @@ export class GameView {
     );
 
     const rows = UPGRADES.map((upgrade) => {
-      const row = this.buildShopRow(upgrade.id, upgrade.icon, upgrade.name, upgrade.description, () =>
+      const row = this.buildShopRow(upgrade.id, upgrade.icon, () =>
         this.purchaseUpgrade(upgrade.id),
       );
       this.upgradeRows.set(upgrade.id, row);
@@ -269,12 +292,8 @@ export class GameView {
 
   private buildPartyPanel(): HTMLElement {
     const rows = COMPANIONS.map((companion) => {
-      const row = this.buildShopRow(
-        companion.id,
-        companion.icon,
-        `${companion.name}, ${companion.title}`,
-        `+${formatNumber(companion.damagePerLevel)} damage per second.`,
-        () => this.purchaseCompanion(companion.id),
+      const row = this.buildShopRow(companion.id, companion.icon, () =>
+        this.purchaseCompanion(companion.id),
       );
       this.companionRows.set(companion.id, row);
       return row.root;
@@ -283,7 +302,7 @@ export class GameView {
     return this.track(
       'panel-party',
       el('section', { class: 'panel' }, [
-        el('p', { class: 'hint' }, ['Companions fight on their own and never stop.']),
+        el('p', { class: 'hint' }, [t('party.hint')]),
         el('div', { class: 'rows' }, rows),
       ]),
     );
@@ -292,53 +311,61 @@ export class GameView {
   private buildDescendPanel(): HTMLElement {
     const button = this.track(
       'descendButton',
-      el('button', { class: 'descend', type: 'button' }, ['Descend']),
+      el('button', { class: 'descend', type: 'button' }, [t('descend.button')]),
     );
     button.addEventListener('click', () => this.callbacks.onDescend());
 
-    const wipe = el('button', { class: 'danger', type: 'button' }, ['Erase save']);
+    const wipe = el('button', { class: 'danger', type: 'button' }, [t('settings.wipe')]);
     wipe.addEventListener('click', () => this.callbacks.onWipe());
 
     const notationButton = this.track(
       'notationButton',
-      el('button', { class: 'quiet', type: 'button' }, ['Notation: suffix']),
+      el('button', { class: 'quiet', type: 'button' }, ['']),
     );
     notationButton.addEventListener('click', () => {
-      this.notation = this.notation === 'suffix' ? 'scientific' : 'suffix';
+      const order: readonly Notation[] = ['korean', 'suffix', 'scientific'];
+      const next = order[(order.indexOf(this.notation) + 1) % order.length];
+      this.notation = next ?? 'suffix';
+      this.onNotationChange?.(this.notation);
+    });
+
+    const languageButton = this.track(
+      'languageButton',
+      el('button', { class: 'quiet', type: 'button' }, ['']),
+    );
+    languageButton.addEventListener('click', () => {
+      this.callbacks.onLanguageChange(getLocale() === 'ko' ? 'en' : 'ko');
     });
 
     return this.track(
       'panel-descend',
       el('section', { class: 'panel' }, [
         el('div', { class: 'descend-card' }, [
-          el('h2', {}, ['Leave the run behind']),
-          el('p', { class: 'hint' }, [
-            'Surrender this run to keep its relics. Every relic is a permanent +25% ' +
-              'to damage and gold, on this run and every run after it.',
-          ]),
+          el('h2', {}, [t('descend.title')]),
+          el('p', { class: 'hint' }, [t('descend.body')]),
           el('div', { class: 'relic-preview' }, [
             this.track('pendingRelics', el('strong', {}, ['0'])),
-            el('span', {}, [' relics']),
+            el('span', {}, [` ${t('descend.relics')}`]),
           ]),
           this.track('descendHint', el('p', { class: 'lock' }, [''])),
           button,
         ]),
         el('div', { class: 'stats-card' }, [
-          el('h3', {}, ['This save']),
+          el('h3', {}, [t('stats.title')]),
           this.track('statLines', el('dl', { class: 'stats' })),
         ]),
-        el('div', { class: 'settings' }, [notationButton, wipe]),
+        el('div', { class: 'settings' }, [languageButton, notationButton, wipe]),
       ]),
     );
   }
 
   private buildOfflineModal(): HTMLElement {
-    const dismiss = el('button', { class: 'primary', type: 'button' }, ['Continue']);
+    const dismiss = el('button', { class: 'primary', type: 'button' }, [t('offline.continue')]);
     dismiss.addEventListener('click', () => this.callbacks.onDismissOffline());
 
     const double = this.track(
       'offlineDouble',
-      el('button', { class: 'ad', type: 'button' }, ['▶ Double it']),
+      el('button', { class: 'ad', type: 'button' }, [t('offline.double')]),
     );
     double.addEventListener('click', () => this.callbacks.onDoubleOffline());
 
@@ -346,14 +373,14 @@ export class GameView {
       'offlineModal',
       el('div', { class: 'modal-backdrop' }, [
         el('div', { class: 'modal' }, [
-          el('h2', {}, ['While you were away']),
+          el('h2', {}, [t('offline.title')]),
           this.track('offlineDuration', el('p', { class: 'away' }, [''])),
           el('dl', { class: 'stats' }, [
-            el('dt', {}, ['Gold']),
+            el('dt', {}, [t('offline.gold')]),
             this.track('offlineGold', el('dd', {}, ['0'])),
-            el('dt', {}, ['Kills']),
+            el('dt', {}, [t('offline.kills')]),
             this.track('offlineKills', el('dd', {}, ['0'])),
-            el('dt', {}, ['Floors']),
+            el('dt', {}, [t('offline.floors')]),
             this.track('offlineFloors', el('dd', {}, ['0'])),
           ]),
           this.track('offlineCap', el('p', { class: 'lock' }, [''])),
@@ -398,14 +425,11 @@ export class GameView {
     readonly cappedOut: boolean;
     readonly canDouble: boolean;
   }): void {
-    setText(this.ref('offlineDuration'), `You were gone ${formatDuration(summary.awaySeconds)}.`);
+    setText(this.ref('offlineDuration'), t('offline.away', { duration: duration(summary.awaySeconds) }));
     setText(this.ref('offlineGold'), this.num(summary.gold));
     setText(this.ref('offlineKills'), this.num(summary.kills));
     setText(this.ref('offlineFloors'), String(summary.floors));
-    setText(
-      this.ref('offlineCap'),
-      summary.cappedOut ? 'The party can only press on for eight hours unattended.' : '',
-    );
+    setText(this.ref('offlineCap'), summary.cappedOut ? t('offline.cap') : '');
     setHidden(this.ref('offlineDouble'), !summary.canDouble);
     setHidden(this.ref('offlineModal'), false);
   }
@@ -432,7 +456,7 @@ export class GameView {
     );
 
     setText(this.ref('zone'), zoneName(state.floor));
-    setText(this.ref('depth'), `Floor ${state.floor}`);
+    setText(this.ref('depth'), t('combat.floor', { n: state.floor }));
 
     const maxHealth = maxHealthOfCurrentEnemy(state);
     const fraction = maxHealth.isZero
@@ -457,20 +481,23 @@ export class GameView {
 
     const killFraction = Math.min(1, state.killsOnFloor / KILLS_PER_FLOOR);
     setVariable(this.ref('killFill'), '--fill', `${(killFraction * 100).toFixed(0)}%`);
-    setText(this.ref('killText'), `${state.killsOnFloor} / ${KILLS_PER_FLOOR}`);
+    setText(
+      this.ref('killText'),
+      t('combat.killProgress', { done: state.killsOnFloor, total: KILLS_PER_FLOOR }),
+    );
 
     setText(this.ref('dps'), this.num(stats.damagePerSecond));
     setText(
       this.ref('blessing'),
-      stats.blessed ? ` · blessed ${formatDuration(state.blessingRemaining)}` : '',
+      stats.blessed ? ` · ${t('combat.blessed', { time: duration(state.blessingRemaining) })}` : '',
     );
 
     setHidden(this.ref('boosts'), !this.adsAvailable);
     if (this.adsAvailable) {
-      setText(this.ref('chestButton'), `▶ Chest · ${this.num(chestValue(state))}`);
+      setText(this.ref('chestButton'), t('boost.chest', { amount: this.num(chestValue(state)) }));
       setText(
         this.ref('blessingButton'),
-        `▶ Blessing · 2× for ${formatDuration(BLESSING_DURATION_SECONDS)}`,
+        t('boost.blessing', { minutes: Math.round(BLESSING_DURATION_SECONDS / 60) }),
       );
     }
 
@@ -478,7 +505,8 @@ export class GameView {
     if (this.tab === 'party') this.updateParty();
     if (this.tab === 'descend') this.updateDescend();
 
-    setText(this.ref('notationButton'), `Notation: ${this.notation}`);
+    setText(this.ref('notationButton'), t('settings.notation', { mode: t(`notation.${this.notation}`) }));
+    setText(this.ref('languageButton'), t('settings.language'));
   }
 
   private updateShop(): void {
@@ -491,8 +519,11 @@ export class GameView {
       if (!unlocked) continue;
 
       const level = this.state.upgrades[definition.id];
+      setText(row.name, upgradeName(definition.id));
+      setText(row.description, upgradeDescription(definition.id));
+
       const capped = definition.maxLevel !== undefined && level >= definition.maxLevel;
-      setText(row.level, capped ? 'MAX' : `Lv ${level}`);
+      setText(row.level, capped ? t('shop.maxed') : t('shop.level', { n: level }));
 
       if (capped) {
         setText(row.cost, '—');
@@ -530,7 +561,12 @@ export class GameView {
       if (!unlocked) continue;
 
       const level = this.state.companions[definition.id];
-      setText(row.level, `Lv ${level}`);
+      setText(row.name, companionName(definition.id));
+      setText(
+        row.description,
+        t('party.damage', { amount: formatNumber(definition.damagePerLevel) }),
+      );
+      setText(row.level, t('shop.level', { n: level }));
       const price = nextCompanionCost(this.state, definition.id);
       setText(row.cost, this.num(price));
       setText(row.quantity, '');
@@ -547,20 +583,18 @@ export class GameView {
     setDisabled(this.ref('descendButton') as HTMLButtonElement, !ready);
     setText(
       this.ref('descendHint'),
-      ready
-        ? 'Gold, upgrades and companions are lost. Relics are not.'
-        : `Clear floor ${DESCENT_UNLOCK_FLOOR} to unlock descending.`,
+      ready ? t('descend.ready') : t('descend.locked', { n: DESCENT_UNLOCK_FLOOR }),
     );
 
     const stats = this.state.stats;
     const lines: Array<[string, string]> = [
-      ['Deepest floor', String(this.state.highestFloor)],
-      ['Descents', String(stats.descents)],
-      ['Kills', this.num(stats.totalKills)],
-      ['Guardians felled', this.num(stats.guardiansFelled)],
-      ['Guardians escaped', this.num(stats.guardiansEscaped)],
-      ['Gold earned', this.num(this.state.lifetimeGold)],
-      ['Time delved', formatDuration(stats.playSeconds)],
+      [t('stats.deepest'), String(this.state.highestFloor)],
+      [t('stats.descents'), String(stats.descents)],
+      [t('stats.kills'), this.num(stats.totalKills)],
+      [t('stats.guardiansFelled'), this.num(stats.guardiansFelled)],
+      [t('stats.guardiansEscaped'), this.num(stats.guardiansEscaped)],
+      [t('stats.goldEarned'), this.num(this.state.lifetimeGold)],
+      [t('stats.timePlayed'), duration(stats.playSeconds)],
     ];
 
     const list = this.ref('statLines');

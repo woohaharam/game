@@ -45,7 +45,26 @@ body {
   height: 100%;
   background: var(--stone-900);
   color: var(--ink);
-  font: 15px/1.45 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /*
+   * `system-ui` first so each platform reaches for its own Korean face — Apple
+   * SD Gothic Neo, Malgun Gothic, Noto Sans KR — rather than a Latin font
+   * falling back to whatever happens to have Hangul coverage. The named
+   * families behind it are the fallbacks for browsers where system-ui resolves
+   * to a Latin-only face.
+   */
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic',
+    'Noto Sans KR', sans-serif;
+  /* Korean sits taller in the line box than Latin and needs the extra leading. */
+  font-size: 15px;
+  line-height: 1.55;
+  /*
+   * Korean breaks at any character by default, so a two-word phrase can be
+   * split down its middle. `keep-all` moves the break to spaces, which is how
+   * Korean is actually set; `break-word` keeps a long unbroken run — a number
+   * with a unit, a URL — from overflowing the column.
+   */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }

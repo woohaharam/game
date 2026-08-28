@@ -12,6 +12,8 @@
 
 import './ui/styles.css';
 
+import { defaultNotation, detectLocale, setLocale, t, LOCALE_STORAGE_KEY, type Locale } from '@core/i18n';
+import type { Notation } from '@core/format';
 import { createStore } from '@core/storage';
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
 import { canDescend, descend } from '@game/prestige';
@@ -38,8 +40,11 @@ const AUTOSAVE_INTERVAL_MS = 10_000;
 const RENDER_INTERVAL_MS = 1000 / 20;
 
 function boot(): void {
-  const root = document.querySelector<HTMLElement>('#app');
-  if (root === null) throw new Error('#app missing');
+  const found = document.querySelector<HTMLElement>('#app');
+  if (found === null) throw new Error('#app missing');
+  // Rebound after the guard: `rebuildView` is a hoisted declaration, and the
+  // narrowing on the original binding does not reach into it.
+  const root: HTMLElement = found;
 
   const store = createStore();
   const loaded = load(store);
@@ -62,12 +67,26 @@ function boot(): void {
 
   let pendingOffline: OfflineResult | null = null;
 
-  const view = new GameView(root, state, {
+  // Preferences live outside the save: erasing a run should not drop the player
+  // back into a language they cannot read.
+  const NOTATION_KEY = 'deepdelve.notation';
+  const locale = detectLocale({
+    stored: store.read(LOCALE_STORAGE_KEY),
+    search: globalThis.location?.search,
+    languages: navigator.languages,
+  });
+  setLocale(locale);
+
+  const storedNotation = store.read(NOTATION_KEY);
+  const notation: Notation =
+    storedNotation === 'suffix' || storedNotation === 'scientific' || storedNotation === 'korean'
+      ? storedNotation
+      : defaultNotation(locale);
+
+  const callbacks = {
     onDescend: () => {
       if (!canDescend(state)) return;
-      const confirmed = globalThis.confirm(
-        'Descend? This run’s gold, upgrades and companions are lost. Relics are kept.',
-      );
+      const confirmed = globalThis.confirm(t('descend.confirm'));
       if (!confirmed) return;
       descend(state);
       save(store, state);
@@ -99,12 +118,37 @@ function boot(): void {
       });
     },
     onWipe: () => {
-      if (!globalThis.confirm('Erase this save permanently?')) return;
+      if (!globalThis.confirm(t('settings.wipeConfirm'))) return;
       wipe(store);
       globalThis.location.reload();
     },
-  });
+    onLanguageChange: (next: Locale) => {
+      setLocale(next);
+      store.write(LOCALE_STORAGE_KEY, next);
+      // Every label in the tree was written in the old language, so the view is
+      // rebuilt rather than retranslated in place. That is the right trade: the
+      // build-once design pays off across millions of frames, and a language
+      // switch happens at most a handful of times in a save's life.
+      rebuildView(defaultNotation(next));
+    },
+  };
 
+  let view = new GameView(root, state, callbacks);
+
+  function rebuildView(withNotation: Notation): void {
+    const carried = view.getUiState();
+    root.replaceChildren();
+    view = new GameView(root, state, callbacks);
+    view.setNotation(withNotation);
+    view.onNotationChange = (chosen) => store.write(NOTATION_KEY, chosen);
+    view.setAdsAvailable(provider.rewardedAvailable());
+    view.mount();
+    view.restoreUiState(carried);
+    view.update();
+  }
+
+  view.setNotation(notation);
+  view.onNotationChange = (chosen) => store.write(NOTATION_KEY, chosen);
   view.setAdsAvailable(provider.rewardedAvailable());
   view.mount();
 

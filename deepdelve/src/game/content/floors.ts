@@ -9,6 +9,7 @@
  */
 
 import { Decimal } from '@core/decimal';
+import { t } from '@core/i18n';
 
 /** Trash monsters cleared before the floor's guardian appears. */
 export const KILLS_PER_FLOOR = 10;
@@ -67,55 +68,39 @@ export function guardianGold(floor: number): Decimal {
   return monsterGold(floor).multiply(Decimal.of(BOSS_GOLD_FACTOR, 0));
 }
 
-/** Ten floors per zone; the names cycle, prefixed once the hero laps them. */
-const ZONES = [
-  'Mossy Crypt',
-  'Bone Halls',
-  'Ember Deep',
-  'Drowned Vault',
-  'Shadowspire',
-  'Silent Foundry',
-  'Weeping Gardens',
-  'Obsidian Reach',
-] as const;
+/**
+ * Ten floors per zone; the names cycle, prefixed once the hero laps them.
+ *
+ * The names themselves live in the locale tables — this module owns which zone
+ * a floor belongs to, not what that zone is called, so adding a language never
+ * touches the curves.
+ */
+export const ZONE_COUNT = 8;
+
+/** Distinct monster names per zone, so a floor is not ten identical rats. */
+export const MONSTERS_PER_ZONE = 3;
+
+function zoneIndex(floor: number): number {
+  return Math.max(0, Math.floor((floor - 1) / 10));
+}
 
 export function zoneName(floor: number): string {
-  const index = Math.max(0, Math.floor((floor - 1) / 10));
-  const name = ZONES[index % ZONES.length] ?? ZONES[0];
-  const lap = Math.floor(index / ZONES.length);
-  if (lap === 0) return name;
-  return `${name} · Deeper ${'I'.repeat(Math.min(lap, 3))}${lap > 3 ? `×${lap}` : ''}`;
-}
+  const index = zoneIndex(floor);
+  const key = `zone.${(index % ZONE_COUNT) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}` as const;
+  const name = t(key);
 
-const MONSTERS = [
-  ['Crypt Rat', 'Grave Moss', 'Pale Beetle'],
-  ['Rattling Bones', 'Bone Archer', 'Cracked Knight'],
-  ['Ash Imp', 'Cinder Hound', 'Magma Slug'],
-  ['Drowned Thrall', 'Reef Lurker', 'Barnacle Ogre'],
-  ['Shade', 'Mirror Wraith', 'Nightbloom'],
-  ['Rust Automaton', 'Steam Golem', 'Loose Cog'],
-  ['Thornling', 'Weeping Dryad', 'Sap Horror'],
-  ['Glass Stalker', 'Obsidian Maw', 'Void Shard'],
-] as const;
+  const lap = Math.floor(index / ZONE_COUNT);
+  if (lap === 0) return name;
+  return t('zone.deeper', { zone: name, lap });
+}
 
 export function monsterName(floor: number, index: number): string {
-  const zone = Math.max(0, Math.floor((floor - 1) / 10)) % MONSTERS.length;
-  const pool = MONSTERS[zone] ?? MONSTERS[0];
-  return pool[Math.abs(index) % pool.length] ?? 'Something';
+  const zone = (zoneIndex(floor) % ZONE_COUNT) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  const slot = (Math.abs(index) % MONSTERS_PER_ZONE) as 0 | 1 | 2;
+  return t(`monster.${zone}.${slot}` as const);
 }
 
-const GUARDIANS = [
-  'The Grave Warden',
-  'Ossuary King',
-  'Cinderjaw',
-  'The Drowned Choir',
-  'Your Own Shadow',
-  'Prime Automaton',
-  'The Weeping Root',
-  'Glass Tyrant',
-] as const;
-
 export function guardianName(floor: number): string {
-  const zone = Math.max(0, Math.floor((floor - 1) / 10)) % GUARDIANS.length;
-  return GUARDIANS[zone] ?? 'The Warden';
+  const zone = (zoneIndex(floor) % ZONE_COUNT) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  return t(`guardian.${zone}` as const);
 }

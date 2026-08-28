@@ -13,6 +13,7 @@
  */
 
 import { Decimal } from '@core/decimal';
+import { t } from '@core/i18n';
 
 export type UpgradeId =
   | 'blade'
@@ -24,9 +25,6 @@ export type UpgradeId =
 
 export interface UpgradeDefinition {
   readonly id: UpgradeId;
-  readonly name: string;
-  /** One line, present tense, describing what one more level does. */
-  readonly description: string;
   readonly icon: string;
   readonly baseCost: Decimal;
   readonly costGrowth: number;
@@ -39,8 +37,6 @@ export interface UpgradeDefinition {
 export const UPGRADES: readonly UpgradeDefinition[] = [
   {
     id: 'blade',
-    name: 'Sharpened Blade',
-    description: '+2 damage per strike.',
     icon: '🗡️',
     baseCost: Decimal.of(1.5, 1),
     costGrowth: 1.14,
@@ -48,8 +44,6 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
   },
   {
     id: 'swiftness',
-    name: 'Swift Footing',
-    description: '+0.08 strikes per second.',
     icon: '🌀',
     baseCost: Decimal.of(6, 1),
     costGrowth: 1.19,
@@ -57,8 +51,6 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
   },
   {
     id: 'precision',
-    name: 'Keen Eye',
-    description: '+0.5% chance to strike critically.',
     icon: '🎯',
     baseCost: Decimal.of(4, 2),
     costGrowth: 1.28,
@@ -69,8 +61,6 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
   },
   {
     id: 'ferocity',
-    name: 'Ferocity',
-    description: '+0.15× critical damage.',
     icon: '💢',
     baseCost: Decimal.of(1.2, 3),
     costGrowth: 1.33,
@@ -78,8 +68,6 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
   },
   {
     id: 'greed',
-    name: 'Greedy Hands',
-    description: '+7% gold from every kill.',
     icon: '💰',
     baseCost: Decimal.of(2, 2),
     costGrowth: 1.17,
@@ -87,8 +75,6 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
   },
   {
     id: 'tome',
-    name: 'Ancient Tome',
-    description: '+12% to all damage.',
     icon: '📖',
     baseCost: Decimal.of(2.5, 4),
     costGrowth: 1.45,
@@ -97,6 +83,16 @@ export const UPGRADES: readonly UpgradeDefinition[] = [
 ];
 
 const BY_ID = new Map<UpgradeId, UpgradeDefinition>(UPGRADES.map((u) => [u.id, u]));
+
+/** Display name in the active locale. */
+export function upgradeName(id: UpgradeId): string {
+  return t(`upgrade.${id}.name`);
+}
+
+/** One line, present tense, describing what one more level does. */
+export function upgradeDescription(id: UpgradeId): string {
+  return t(`upgrade.${id}.desc`);
+}
 
 export function upgradeById(id: UpgradeId): UpgradeDefinition {
   const definition = BY_ID.get(id);

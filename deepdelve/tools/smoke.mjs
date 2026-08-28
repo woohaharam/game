@@ -19,7 +19,12 @@ const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
   args: ['--no-sandbox'],
 });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+// A Korean browser, so locale detection is exercised rather than bypassed with
+// an explicit `?lang=`.
+const context = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  locale: 'ko-KR',
+});
 
 const errors = [];
 context.on('page', (p) => {
@@ -53,7 +58,7 @@ for (let i = 0; i < 8; i += 1) {
 }
 console.log('bought  ', JSON.stringify(await read()));
 
-await page.click('.qty-select button:text-is("MAX")');
+await page.click('.qty-select button:text-is("최대")');
 await page.waitForTimeout(2500);
 const maxLabel = await page.textContent('.panel:not([hidden]) .rows .row:not([hidden]) button.buy');
 console.log('MAX button label:', maxLabel.trim());
@@ -76,13 +81,13 @@ const renderedRows = () =>
   page.$$eval('.rows .row', (rs) => rs.filter((r) => r.getBoundingClientRect().height > 0).length);
 
 
-for (const tab of ['Party', 'Descend', 'Upgrades']) {
+for (const tab of ['동료', '심연', '강화']) {
   await page.click(`nav.tabs button:text-is("${tab}")`);
   await page.waitForTimeout(250);
   console.log(`tab ${tab}: panels rendered = ${await renderedPanels()}, rows = ${await renderedRows()}`);
 }
 
-await page.click('nav.tabs button:text-is("Descend")');
+await page.click('nav.tabs button:text-is("심연")');
 await page.waitForTimeout(300);
 console.log('descend hint:', (await page.textContent('.panel:not([hidden]) .lock')).trim());
 console.log('stat values:', (await page.$$eval('.stats-card dd', (n) => n.map((x) => x.textContent))).join(' | '));
@@ -117,5 +122,25 @@ console.log('before close ', JSON.stringify(before));
 console.log('after return ', JSON.stringify(await read(returning)));
 
 await returning.screenshot({ path: 'smoke.png', fullPage: true });
+// Language round trip: the whole tree is rebuilt, so this checks that the
+// rebuild keeps the run rather than resetting it.
+console.log('html lang:', await returning.getAttribute('html', 'lang'));
+console.log('title    :', await returning.title());
+const depthBefore = await returning.textContent('.depth');
+await returning.click('nav.tabs button:text-is("심연")');
+await returning.waitForTimeout(200);
+await returning.click('.settings button:text-is("언어: 한국어")');
+await returning.waitForTimeout(400);
+console.log('after toggle — tabs:', (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '));
+console.log('after toggle — lang/title:', await returning.getAttribute('html', 'lang'), '|', await returning.title());
+console.log('run preserved:', depthBefore, '->', await returning.textContent('.depth'));
+await returning.click('.settings button:text-is("Language: English")');
+await returning.waitForTimeout(400);
+console.log('back to Korean:', (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '));
+
+await returning.click('nav.tabs button:text-is("강화")');
+await returning.waitForTimeout(300);
+console.log('shop rows:', (await returning.$$eval('.panel:not([hidden]) .row:not([hidden]) .name', (n) => n.map((x) => x.textContent.trim()))).join(' | '));
+
 console.log(errors.length === 0 ? 'NO PAGE ERRORS' : 'ERRORS:\n' + errors.join('\n'));
 await browser.close();

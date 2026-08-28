@@ -11,13 +11,12 @@
  */
 
 import { Decimal } from '@core/decimal';
+import { t } from '@core/i18n';
 
 export type CompanionId = 'torchbearer' | 'houndmaster' | 'runesmith' | 'revenant' | 'archivist';
 
 export interface CompanionDefinition {
   readonly id: CompanionId;
-  readonly name: string;
-  readonly title: string;
   readonly icon: string;
   /** Damage per second contributed by each level, before global multipliers. */
   readonly damagePerLevel: Decimal;
@@ -30,8 +29,6 @@ export interface CompanionDefinition {
 export const COMPANIONS: readonly CompanionDefinition[] = [
   {
     id: 'torchbearer',
-    name: 'Mira',
-    title: 'Torchbearer',
     icon: '🔥',
     damagePerLevel: Decimal.of(3, 0),
     baseCost: Decimal.of(2.5, 2),
@@ -40,8 +37,6 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
   },
   {
     id: 'houndmaster',
-    name: 'Bram',
-    title: 'Houndmaster',
     icon: '🐺',
     damagePerLevel: Decimal.of(4.5, 1),
     baseCost: Decimal.of(6, 3),
@@ -50,8 +45,6 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
   },
   {
     id: 'runesmith',
-    name: 'Sable',
-    title: 'Runesmith',
     icon: '🪬',
     damagePerLevel: Decimal.of(9, 2),
     baseCost: Decimal.of(4, 5),
@@ -60,8 +53,6 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
   },
   {
     id: 'revenant',
-    name: 'Kest',
-    title: 'The Revenant',
     icon: '💀',
     damagePerLevel: Decimal.of(2.2, 5),
     baseCost: Decimal.of(9, 8),
@@ -70,8 +61,6 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
   },
   {
     id: 'archivist',
-    name: 'Oduun',
-    title: 'The Archivist',
     icon: '📜',
     damagePerLevel: Decimal.of(1.4, 9),
     baseCost: Decimal.of(3, 13),
@@ -81,6 +70,11 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
 ];
 
 const BY_ID = new Map<CompanionId, CompanionDefinition>(COMPANIONS.map((c) => [c.id, c]));
+
+/** Display name in the active locale, including the companion's title. */
+export function companionName(id: CompanionId): string {
+  return t(`companion.${id}.name`);
+}
 
 export function companionById(id: CompanionId): CompanionDefinition {
   const definition = BY_ID.get(id);
