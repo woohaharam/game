@@ -18,12 +18,12 @@ src/game/       The game, with no knowledge of the DOM
   state.ts        The complete mutable state, plain data throughout
   stats.ts        Derives effective numbers from what was bought
   shop.ts         Purchasing, quoting, and a simulated player
-  prestige.ts     Descending, and the curve that makes it work
+  prestige.ts     Compressing, and the curve that makes it work
   offline.ts      Crediting time away
   save.ts         Versioned encode/decode with repair
   transfer.ts     Portable save codes
   rewards.ts      What a watched advertisement buys
-  content/        Curves and tables: floors, upgrades, companions
+  content/        Curves and tables: stages, refinements, orbiters
 
 src/platform/   The world outside the game
   ads.ts          One ad interface, with the portal rules enforced around it
@@ -32,13 +32,13 @@ src/platform/   The world outside the game
 
 src/ui/         The view: built once, updated in place
   view.ts         Shell: header, tabs, orchestration
-  catalogue.ts    Upgrades and companions behind one shape
-  panels/         Combat, shop, descend, offline
+  catalogue.ts    Refinements and orbiters behind one shape
+  panels/         Stone, shop, compression, offline
 ```
 
 Dependencies point one way: `ui` → `game` → `core`, with `platform` reachable
 from `ui` and `main`. Nothing in `game` imports from `ui` or touches the DOM,
-which is what lets the whole simulation — including twenty descents of a
+which is what lets the whole simulation — including twenty compressions of a
 simulated player — run headlessly in a test or a balance probe.
 
 ## One function moves time
@@ -54,25 +54,25 @@ best way to play. Sharing the function makes the question meaningless.
 
 Serving both from one function forces it to be **O(events), not O(ticks)**.
 Eight hours at sixty ticks a second is 1.7 million iterations; eight hours of
-_events_ is a few thousand, because kills that happen at a constant rate can be
-counted with a division. A walled hero costs about three iterations per
-thirty-second guardian cycle, so an eight-hour catch-up is roughly 2,800.
+_events_ is a few thousand, because fragments absorbed at a constant rate can be
+counted with a division. A walled stone costs a handful of iterations per stage, so an
+eight-hour catch-up stays in the low thousands.
 
-Randomness is deliberately absent. Criticals are folded into DPS as an
+Randomness is deliberately absent. Resonance is folded into the absorption rate as an
 expectation rather than rolled, so eight hours away pays exactly what eight
 hours watched would have. A dice roll would make the two disagree by variance
 alone, and players would — correctly — call that cheating.
 
 `tests/simulation.test.ts` asserts the property directly: one 7,200-second step
-and 28,800 frame-sized steps reach identical kill counts and gold within 1e-9,
+and 28,800 frame-sized steps reach identical fragment counts and dust within 1e-9,
 across step sizes from 0.25s to two hours.
 
 ### Rate, not duration
 
-Kills are capped at one per 50ms. The cap has to be expressed as a **damage
+Absorption is capped at one fragment per 50ms. The cap has to be expressed as a **damage
 rate**, not as a minimum kill duration — the two look equivalent and are not.
 
-Clamping the duration means a hero who overkills a monster inside a single 16ms
+Clamping the duration means a hero who overkills a fragment inside a single 16ms
 frame has the kill refused by the clamp _and_ the leftover time discarded, and
 the fight never resolves. Capping the rate keeps health strictly linear in time,
 so a kill lands at the same simulated moment whether it is reached in one step
@@ -106,23 +106,23 @@ Two traps worth knowing about, both caught by tests:
 
 Every run walls, structurally rather than through tuning. Upgrades give flat
 damage at exponentially rising cost, so damage grows with the _logarithm_ of
-gold; monster health grows exponentially with depth. Logarithmic growth cannot
-chase exponential growth, so no amount of patience gets a run past its ceiling.
-That is the genre working as intended: the run is not the game, the sequence of
-runs is.
+dust; fragment health grows exponentially with depth. Logarithmic growth cannot
+chase exponential growth, so no amount of patience gets a stone past its
+ceiling. That is the genre working as intended: one stone is not the game, the
+sequence of stones is.
 
-Descending is what makes the sequence go somewhere, and it works only if
+Compressing is what makes the sequence go somewhere, and it works only if
 
 ```
-log(relicGrowth) / log(healthGrowth) > 1
+log(crystalGrowth) / log(massGrowth) > 1
 ```
 
-Below 1 the map from one descent to the next is a contraction with a fixed
-point: runs converge on a single depth and the game ends without saying so. At
-1.36 a simulated player crawls from floor 213 to 228 across twenty descents and
-stops. At 1.75 the gains _multiply_ and floor 4,000 arrives in two days. At 1.58
-the ratio is 1.044 — measured over twenty descents the gain climbs from +18
-floors to +149 and never plateaus.
+Below 1 the map from one compression to the next is a contraction with a
+fixed point: stones converge on a single stage and the game ends without saying so. At
+1.36 a simulated player crawls from stage 213 to 228 across twenty compressions and
+stops. At 1.75 the gains _multiply_ and stage 4,000 arrives in two days. At 1.58
+the ratio is 1.044 — measured over twenty compressions the gain climbs from +35
+stages to +189 and never plateaus.
 
 `tests/save.test.ts` asserts the **ratio**, not the payout, because the payout
 can be retuned freely and the ratio cannot. `docs/BALANCE.md` is regenerated by
@@ -144,7 +144,7 @@ string it already holds still costs a style recalculation.
 There is no framework because there is nothing for one to do: the view is a
 fixed tree and updating it is assigning strings to it.
 
-Upgrades and companions are rendered by **one** panel over a common
+Refinements and orbiters are rendered by **one** panel over a common
 `ShopEntry` shape. They differ in what they sell and in nothing else, and when
 they had separate render paths a fix to one had to be made twice. Buy buttons
 are labelled from the same `quote*` functions the click calls, so a button can
@@ -212,7 +212,7 @@ reaches for its own Hangul face instead of a Latin font falling back to whatever
 has coverage.
 
 Content is translated rather than transliterated. Names live in the locale
-tables, so the content modules own which zone a floor belongs to, not what it is
+tables, so the content modules own which zone a stage belongs to, not what it is
 called, and adding a language never touches the curves.
 
 ## What the tests cannot see
@@ -224,8 +224,7 @@ is why that script asserts against rendered geometry rather than DOM properties:
   so the explicit `display: grid` on `.panel` silently beat it. Setting
   `.hidden = true` appeared to work and changed nothing — and a DOM-property
   assertion reported one visible panel throughout.
-- The opening nine and a half seconds showed a health bar moving and nothing
-  else. A portal player decides in less time than that.
+- The opening nine and a half seconds showed a bar moving and nothing else. A portal player decides in less time than that.
 
 ## Invariants worth guarding
 
@@ -233,7 +232,7 @@ is why that script asserts against rendered geometry rather than DOM properties:
    know what a stretch of time is worth runs it on a `cloneState` copy.
 2. No randomness in the simulation. Expectations only.
 3. Nothing in `src/game` imports from `src/ui` or touches the DOM.
-4. `log(relicGrowth) / log(healthGrowth)` stays above 1.
+4. `log(crystalGrowth) / log(massGrowth)` stays above 1.
 5. Locale tables are complete by construction: each is a `Record` over a finite
    key union, so a missing translation fails the build.
 6. Buy buttons are labelled from the same quote the click acts on.

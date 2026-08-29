@@ -63,11 +63,12 @@ structural rather than lucky:
 - **Sessions repeat.** A player who comes back four times a day sees four times
   the ad opportunities of one who plays once. Retention is the multiplier that
   matters, and idle games are built around returning.
-- **The rewards are native.** Doubling an offline haul, a timed boost, a chest —
+- **The rewards are native.** Doubling an offline haul, a timed blessing, a cache —
   these are things a player genuinely wants at a moment when they are already
   looking at a summary screen. Nobody has to be interrupted.
-- **There is a natural break.** Descending ends a run. That is the one place an
-  interstitial belongs, and it is why this game shows one there and nowhere else.
+- **There is a natural break.** Compressing ends a stone. That is the one place
+  an interstitial belongs, and it is why this game shows one there and nowhere
+  else.
 
 The trap is the mirror image: an idle game can be made to demand ads to
 progress, and portals and players both punish that. This one is completable

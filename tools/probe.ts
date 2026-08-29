@@ -109,7 +109,7 @@ function toMarkdown(rows: StoneRow[]): string {
     '',
     '## What this has to show',
     '',
-    'Reachable stage goes as `log(multiplier) / log(healthGrowth)`, and the crystal',
+    'Reachable stage goes as `log(multiplier) / log(massGrowth)`, and the crystal',
     'multiplier goes as `crystalGrowth^depth`, so one descent maps to the next',
     'roughly linearly. If the gain per descent shrinks toward zero, the runs have a',
     'fixed point: the player compresss forever and never moves, and the game ends',

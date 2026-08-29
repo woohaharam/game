@@ -1,139 +1,140 @@
-# DeepDelve
+# 돌멩이 키우기 · Pebble to Planet
 
-An idle fantasy dungeon RPG for the browser. A hero descends floor by floor,
-fights without being told to, and keeps fighting while the tab is closed. When
-the run stalls — and every run stalls — you surrender it for relics that make
-the next one faster.
+An idle growing game for the browser. A grain of sand pulls in dust, becomes
+gravel, becomes a boulder, a mountain, a moon, a star — and when it can grow no
+further you collapse it into crystal and start again heavier.
 
-Built to be published on web game portals (CrazyGames, Poki, itch.io), where the
-revenue model is the portal's ad share. That constraint shapes the whole build:
-no backend, no accounts, no payments, a bundle small enough to load over a phone
-connection, and a game that is complete for someone who never watches an ad.
+Written in strict TypeScript with **no game framework and no downloaded assets**
+— every sound is synthesised and every icon is a glyph — in about 21 KB gzipped.
+Korean and English.
+
+Built for web game portals, where the revenue model is the portal's ad share.
+That constraint shapes the whole build: no backend, no accounts, a relative asset
+base so it runs from any subdirectory, and a game that stays complete for someone
+who never watches an ad.
 
 ```bash
 npm install
 npm run dev       # development server
-npm run verify    # typecheck + unit tests
+npm run verify    # format, lint, typecheck, tests
 npm run build     # production bundle
+npm run balance   # simulate twenty compressions and print the pacing report
 npm run smoke     # end-to-end browser check (needs `npm run preview` running)
-npm run balance   # simulate twenty descents and print the pacing report
-npm run lint      # type-aware ESLint
-npm run format    # apply Prettier
+npm run package   # upload-ready archive
 ```
 
 ## The decisions worth explaining
+
+**There is no failure state, and that is structural.** A dungeon crawler can
+push a hero back down a floor. A stone that has grown cannot un-grow. So there
+is no timer to fail and no way back: when a stage becomes too heavy to absorb,
+the player slows down. That is the genre's honest version of a wall, and the
+test suite asserts it directly — across four power levels and three step sizes,
+neither the stage nor the mass ever decreases.
 
 **One simulation, used twice.** `advance(state, seconds)` is the only thing that
 moves the game forward. The frame loop calls it with ~0.016; the offline
 catch-up calls it with up to eight hours. That is not tidiness — it is the only
 way the two can be guaranteed not to disagree. Idle games that estimate offline
 progress separately end up with a discrepancy, and the discrepancy is always an
-exploit: players work out whether it pays to close the tab, and the honest way
-to play stops being the best way to play.
+exploit: players work out whether it pays to close the tab, and the honest way to
+play stops being the best way to play.
 
-Serving both from one function means it has to be O(events), not O(ticks). Eight
+Serving both from one function forces it to be O(events), not O(ticks). Eight
 hours at sixty ticks a second is 1.7 million iterations; eight hours of _events_
-is a few thousand, because kills at a constant rate can be counted with a
-division. Criticals are folded into DPS as an expectation rather than rolled,
-since a dice roll would make eight hours away disagree with eight hours watched
-by variance alone. The test suite asserts that one 7,200-second step and 28,800
-frame-sized steps produce identical kill counts and gold within 1e-9.
+is a few thousand, because fragments absorbed at a constant rate can be counted
+with a division. Resonance is folded into the absorption rate as an expectation
+rather than rolled, since a dice roll would make eight hours away disagree with
+eight hours watched by variance alone. The suite asserts that one 7,200-second
+step and 28,800 frame-sized steps reach identical fragment counts and dust
+within 1e-9.
+
+**Mass is not the currency.** The stone's mass only ever goes up — it is the
+thing being grown and the number the player is here for. Dust, sieved out of
+fragments as they land, is what gets spent. Making the stone shrink when you
+improve it would be the wrong feeling for the entire genre.
+
+It is rendered in the largest unit that leaves a readable number: grams,
+kilograms, tonnes, gigatonnes, then Earths, Suns and galaxies at their real
+figures. That last part is the point of the fiction — once the stone passes a
+planet the number stops being arbitrary and becomes a comparison the player
+already has a feeling for.
 
 **Numbers that do not run out.** Idle progression passes 2^53 within hours and
-1.8e308 within days. Both failures are silent until a save is already ruined, so
-every quantity is a normalised mantissa and a base-10 exponent — about fifteen
-significant digits across a range of roughly 1e±1e308.
+1.8e308 within days, and both failures are silent until a save is already
+ruined. Every quantity is a normalised mantissa and a base-10 exponent: about
+fifteen significant digits across a range of roughly 1e±1e308.
 
-**The relic curve was measured, not chosen.** Reachable depth goes as
-`log(multiplier)/log(healthGrowth)`, and the multiplier goes as
-`relicGrowth^depth`, so one descent maps to the next roughly linearly and the
-ratio of those two growth rates decides everything. Below the health growth the
-map is a contraction: it has a fixed point, runs converge on a single depth, and
-the game ends without saying so — at 1.36 a simulated player crawls from floor
-213 to floor 228 across twenty descents and stops. At 1.75 the gains multiply
-and floor 4,000 arrives inside two days. At 1.58 the gain climbs steadily from
-+19 floors to +170 across 24 descents and never plateaus. `tests/save.test.ts`
-asserts the _ratio_ rather than the payout, because the payout can be retuned
-freely and the ratio cannot.
+**The compression curve was measured, not derived.** Reachable stage goes as
+`log(multiplier)/log(massGrowth)`, and the multiplier goes as
+`crystalGrowth^stage`, so one compression maps to the next roughly linearly and
+the ratio of those growth rates decides everything. Below the mass growth the
+map is a contraction: it has a fixed point, stones converge on a single stage,
+and the game ends without saying so. The curve was first tuned to a number that
+looked right; measuring showed exactly that convergence. The test asserts the
+_ratio_ rather than the payout, because the payout can be retuned freely and the
+ratio cannot. [`docs/BALANCE.md`](docs/BALANCE.md) holds the current
+measurement, regenerated by `npm run balance -- --write`.
 
 **Advertising rules live in one place.** Portals largely agree: rewarded ads
 opt-in, interstitials infrequent, audio stopped while an ad runs, and the game
 completable without any of it. Those are enforced in a decorator wrapped around
 every provider rather than at each call site — a rule enforced at the call site
 is one that gets forgotten at the next call site. Each portal SDK is a small
-structurally-typed adapter; nothing outside `src/platform` names a portal. The
-SDKs arrive as globals injected around the build, so every method is
-feature-detected, and an SDK that is missing, half-built, or throwing degrades
-to "no ads available" — never to "reward granted".
-
-## What the browser caught that the tests did not
-
-Two bugs shipped past a green suite and were found by
-[`tools/smoke.mjs`](tools/smoke.mjs), which is why that script asserts against
-rendered geometry rather than DOM properties:
-
-- Every panel rendered at once. `hidden` is only a UA-stylesheet `display:none`,
-  so the explicit `display: grid` on `.panel` silently beat it. Setting
-  `.hidden = true` appeared to work and changed nothing.
-- The first nine and a half seconds of the game showed a health bar moving and
-  nothing else — no kill, no gold, no reason to stay. A portal player decides in
-  less time than that.
-
-## Auto-Delve
-
-Unlocked by the first descent, off by default. Before that point, deciding what
-to buy _is_ the game — the loop is a player learning which curve pays.
-Afterwards, re-buying the same early upgrades on every run is a chore, and
-automating it is the genre's standard answer.
-
-It matters most while the tab is closed. Without it, offline time banks gold
-that is never spent, so the hero never gets stronger and never climbs. With it,
-the offline catch-up runs the same interleave the live loop does, at the same
-interval, for the same reason everything else in the game shares one path:
-leaving the tab open and closing it must not end anywhere different.
+structurally-typed adapter; nothing outside `src/platform` names a portal, every
+method is feature-detected, and an SDK that is missing, half-built or throwing
+degrades to "no ads available" — never to "reward granted".
 
 ## Korean, and what localisation actually costs
-
-The game ships in Korean and English, detected from `?lang=`, then the browser,
-with a toggle that persists outside the save — erasing a run should not drop a
-player back into a language they cannot read.
 
 The interesting part is not the string table. It is that **Korean groups large
 numbers in fours, not threes**: 만 is 10^4, 억 is 10^8, 조 is 10^12. Rendering
 12,345 as `12.34K` asks a Korean reader to stop and convert; `1.234만` is simply
 read. Within a Korean unit the magnitude spans three orders rather than two, so
-the formatter holds four _significant digits_ instead of a fixed decimal count —
-1.234만, 12.34만, 123.4만, 1234만 — and names units as deep as Korean actually
-names them, through 극 (10^48) and the Buddhist series to 무량대수 (10^68),
-before falling back to an exponent.
+the formatter holds four _significant digits_ instead of a fixed decimal count.
 
 Two smaller things that are easy to miss: `word-break: keep-all`, because Korean
 otherwise breaks mid-word and a two-word phrase splits down its middle; and
 `system-ui` first in the font stack, so each platform reaches for its own Hangul
 face rather than a Latin font falling back to whatever has coverage.
 
-Content is translated rather than transliterated — 무덤쥐 and 잉걸불 심층, not
-phonetic renderings of "Crypt Rat" and "Ember Deep", which read as noise. Tests
-assert that the two key sets match exactly, that no Korean value passes English
-through, and that every `{placeholder}` survives translation, since a dropped
-one shows the player a sentence with a hole in it.
+## What the browser caught that the tests did not
+
+Three bugs shipped past a green suite, which is why
+[`tools/smoke.mjs`](tools/smoke.mjs) drives a real browser and asserts against
+rendered geometry rather than DOM properties:
+
+- Every panel rendered at once. `hidden` is only a UA-stylesheet `display:none`,
+  so the explicit `display: grid` on `.panel` silently beat it. Setting
+  `.hidden = true` appeared to work and changed nothing.
+- The first nine and a half seconds showed a bar moving and nothing else. A
+  portal player decides in less time than that.
+- Floating labels rose straight through the mass, making the one digit the
+  player is watching flicker.
+
+A fourth was found by a test written during the re-theme, and had been live in
+the big-number core since it was written: zero is stored as mantissa 0 with
+exponent 0, and `compare` reached the exponent branch before settling zero — so
+`5.25e-2` was judged _smaller than zero_, purely because `-2 < 0`. That made
+`x.max(Decimal.ZERO)` silently collapse every positive value below 1 wherever it
+was used to clamp.
 
 ## Layout
 
 ```
 src/core/      Decimal, formatting, i18n, storage — no game knowledge
-src/game/      simulation, state, content tables, saves, prestige
-src/platform/  ad providers and portal adapters
+src/game/      simulation, state, content curves, saves, compression
+src/platform/  ad providers, portal adapters, synthesised audio
 src/ui/        the view: built once, updated in place
-tools/         balance probe and the browser smoke check
+tools/         balance probe, browser check, packaging
 ```
 
 The reasoning behind the bigger decisions, and the invariants that are easy to
-break silently, are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The
-current measured pacing is in [`docs/BALANCE.md`](docs/BALANCE.md), regenerated
-by `npm run balance -- --write`.
+break silently, are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). How the
+revenue works and what to do before submitting to a portal are in
+[`docs/PUBLISHING.md`](docs/PUBLISHING.md).
 
-## Publishing to a portal
+## Publishing
 
 ```bash
 npm run build              # no SDK — GitHub Pages, itch.io, local
@@ -142,10 +143,20 @@ npm run build:poki         # Poki submission
 ```
 
 The build is fully relative (`base: './'`), so it runs from any subdirectory.
-Each portal target injects that portal's SDK script; `detectAdProvider` finds
-the global at boot, waits for the SDK's own async initialisation, and falls back
-to no ads when there is nothing there. `?ads=debug` grants rewards instantly for
+Each portal target injects that portal's SDK script; `detectAdProvider` finds the
+global at boot, waits for the SDK's own async initialisation, and falls back to
+no ads when there is nothing there. `?ads=debug` grants rewards instantly for
 local testing and is never selected automatically.
 
-How the revenue actually works, what to expect from it, and the pre-submission
-checklist are in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+## History
+
+This repository previously held a second game, a 2D action roguelike called Neon
+Depths. It is tagged `neon-depths-final` and one checkout brings it back:
+
+```bash
+git checkout neon-depths-final -- src tests tools index.html vite.config.ts
+```
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

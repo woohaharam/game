@@ -6,7 +6,7 @@ seconds and compresss once a run stops producing new floors. That shopper is
 deliberately naive, so every number here is a **lower bound**: a thoughtful
 player does better.
 ## What this has to show
-Reachable stage goes as `log(multiplier) / log(healthGrowth)`, and the crystal
+Reachable stage goes as `log(multiplier) / log(massGrowth)`, and the crystal
 multiplier goes as `crystalGrowth^depth`, so one descent maps to the next
 roughly linearly. If the gain per descent shrinks toward zero, the runs have a
 fixed point: the player compresss forever and never moves, and the game ends
