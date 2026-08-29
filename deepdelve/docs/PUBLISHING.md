@@ -115,7 +115,13 @@ Things portals actually reject for, and where this game stands:
 | No crash when the SDK fails          | Every method feature-detected; failure degrades to "no ads"           |
 | Correct SDK for that portal          | `npm run build:crazygames` / `build:poki`                             |
 
-Do these by hand before each submission:
+Build the archive with `npm run package`, `npm run package:crazygames` or
+`npm run package:poki`. Each one verifies what upload forms silently reject:
+`index.html` at the archive **root** rather than inside a folder, and the right
+SDK — or no SDK — actually present in the page. The failure mode without that
+check is an unhelpful "index.html not found" after the upload has finished.
+
+Then do these by hand:
 
 1. `npm run verify` and `npm run smoke`.
 2. Build the portal target and **check the network tab** — confirm the SDK
