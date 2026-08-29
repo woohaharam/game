@@ -79,6 +79,19 @@ rendered geometry rather than DOM properties:
   nothing else — no kill, no gold, no reason to stay. A portal player decides in
   less time than that.
 
+## Auto-Delve
+
+Unlocked by the first descent, off by default. Before that point, deciding what
+to buy _is_ the game — the loop is a player learning which curve pays.
+Afterwards, re-buying the same early upgrades on every run is a chore, and
+automating it is the genre's standard answer.
+
+It matters most while the tab is closed. Without it, offline time banks gold
+that is never spent, so the hero never gets stronger and never climbs. With it,
+the offline catch-up runs the same interleave the live loop does, at the same
+interval, for the same reason everything else in the game shares one path:
+leaving the tab open and closing it must not end anywhere different.
+
 ## Korean, and what localisation actually costs
 
 The game ships in Korean and English, detected from `?lang=`, then the browser,

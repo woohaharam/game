@@ -80,6 +80,11 @@ for (let i = 0; i < 30 && !sawFloat; i += 1) {
 console.log('floating labels seen:', sawFloat);
 console.log('label pool size:', await page.$$eval('.float', (n) => n.length));
 
+// Auto-Delve is locked before the first descent, and says so rather than
+// offering a button that would do nothing.
+console.log('auto-delve hint:', (await page.textContent('.auto-hint')).trim());
+console.log('auto-delve enabled:', await page.isEnabled('.auto-toggle'));
+
 console.log('boosts visible:', await page.isVisible('.boosts'));
 await page.click('.boosts .ad:first-child');
 await page.waitForTimeout(400);

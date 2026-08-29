@@ -41,11 +41,12 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
-import { canDescend, descend } from '@game/prestige';
+import { canAutoDelve, canDescend, descend } from '@game/prestige';
 import { grantBlessing, grantChest } from '@game/rewards';
 import { decode, encode, load, save, wipe } from '@game/save';
 import { fromTransferCode, toTransferCode } from '@game/transfer';
 import { advance } from '@game/simulation';
+import { spendGreedily } from '@game/shop';
 import { GameAudio } from '@platform/audio';
 import { detectAdProvider } from '@platform/portals';
 import { GameView } from '@ui/view';
@@ -78,6 +79,16 @@ const AUTOSAVE_INTERVAL_MS = 10_000;
 
 /** Text updates are throttled; the simulation is not. */
 const RENDER_INTERVAL_MS = 1000 / 20;
+
+/**
+ * How often Auto-Delve visits the shop, in simulated seconds.
+ *
+ * Deliberately the same figure the offline catch-up uses, so a player who
+ * leaves the tab open and one who closes it end up in the same place. Checking
+ * every frame would make the automaton superhuman relative to the balance
+ * measurements, which assume this interval.
+ */
+const AUTO_DELVE_INTERVAL_SECONDS = 10;
 
 function boot(): void {
   const found = document.querySelector<HTMLElement>('#app');
@@ -141,6 +152,11 @@ function boot(): void {
       if (audio.isEnabled()) audio.unlock();
     },
     isSoundOn: () => audio.isEnabled(),
+    onToggleAutoDelve: () => {
+      if (!canAutoDelve(state)) return;
+      state.autoDelve = !state.autoDelve;
+      save(store, state);
+    },
     onExportSave: () => {
       save(store, state);
       const code = toTransferCode(encode(state));
@@ -282,6 +298,7 @@ function boot(): void {
    * repaints still produces a number, instead of being silently dropped.
    */
   let pending: FrameFeedback = emptyFeedback(state.floor);
+  let sinceAutoDelve = 0;
 
   function frame(now: number): void {
     requestAnimationFrame(frame);
@@ -294,6 +311,15 @@ function boot(): void {
       // is safe because `reconcile` on the visibility change credits it in full.
       if (delta > 0 && delta <= MAX_FRAME_SECONDS) {
         const report = advance(state, delta);
+
+        if (state.autoDelve && canAutoDelve(state)) {
+          sinceAutoDelve += delta;
+          if (sinceAutoDelve >= AUTO_DELVE_INTERVAL_SECONDS) {
+            sinceAutoDelve = 0;
+            if (spendGreedily(state) > 0) audio.play('purchase');
+          }
+        }
+
         pending = {
           damage: pending.damage.add(report.damageDealt),
           gold: pending.gold.add(report.goldEarned),

@@ -61,6 +61,17 @@ export function pendingRelics(highestFloor: number): Decimal {
   return raw.floorToInteger();
 }
 
+/**
+ * Auto-Delve appears after the first descent.
+ *
+ * Before then, deciding what to buy *is* the game — the whole loop is a player
+ * learning which curve pays. Afterwards, re-buying the same early upgrades on
+ * every run is a chore, and automating it is the genre's standard answer.
+ */
+export function canAutoDelve(state: GameState): boolean {
+  return state.stats.descents > 0;
+}
+
 export function canDescend(state: GameState): boolean {
   return state.highestFloor >= DESCENT_UNLOCK_FLOOR;
 }

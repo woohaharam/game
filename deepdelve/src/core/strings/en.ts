@@ -29,6 +29,11 @@ export const en = {
   'boost.blessing': '▶ Blessing · 2× for {minutes}m',
   'boost.chest': '▶ Chest · {amount}',
 
+  'shop.autoDelve': 'Auto-Delve',
+  'shop.autoDelveOn': 'on',
+  'shop.autoDelveOff': 'off',
+  'shop.autoDelveHint': 'Spends gold on the cheapest upgrade available, here and while away.',
+  'shop.autoDelveLocked': 'Unlocked by your first descent.',
   'shop.level': 'Lv {n}',
   'shop.maxed': 'MAX',
   'shop.quantityMax': 'MAX',

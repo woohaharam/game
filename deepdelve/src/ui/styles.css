@@ -502,6 +502,43 @@ button.ad {
   gap: 8px;
 }
 
+.auto-delve {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--stone-700);
+  border: 1px dashed var(--stone-500);
+}
+
+.auto-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.auto-hint {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+button.auto-toggle {
+  min-width: 64px;
+  min-height: 36px;
+  padding: 6px 10px;
+  background: var(--stone-600);
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+button.auto-toggle.on {
+  background: linear-gradient(180deg, #1d4a56, #14323a);
+  border: 1px solid var(--relic);
+  color: var(--relic);
+}
+
 .row {
   display: grid;
   grid-template-columns: auto 1fr auto;

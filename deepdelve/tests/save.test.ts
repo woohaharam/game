@@ -5,7 +5,13 @@ import { decode, encode, load, save, SAVE_KEY } from '../src/game/save';
 import { createInitialState } from '../src/game/state';
 import { advance } from '../src/game/simulation';
 import { applyOfflineProgress, OFFLINE_CAP_SECONDS } from '../src/game/offline';
-import { canDescend, descend, pendingRelics, DESCENT_UNLOCK_FLOOR } from '../src/game/prestige';
+import {
+  canAutoDelve,
+  canDescend,
+  descend,
+  pendingRelics,
+  DESCENT_UNLOCK_FLOOR,
+} from '../src/game/prestige';
 import { autoplay } from '../src/game/autoplay';
 import { bulkCost } from '../src/game/content/cost-curve';
 import { UPGRADES } from '../src/game/content/upgrades';
@@ -335,5 +341,69 @@ describe('purchasing', () => {
 
     expect(buyCompanion(state, definition.id, Number.MAX_SAFE_INTEGER).bought).toBe(12);
     expect(state.gold.isNegative).toBe(false);
+  });
+});
+
+describe('Auto-Delve', () => {
+  it('stays locked until the first descent', () => {
+    const state = createInitialState(0);
+    expect(canAutoDelve(state)).toBe(false);
+
+    state.highestFloor = 40;
+    descend(state, 0);
+    expect(canAutoDelve(state)).toBe(true);
+  });
+
+  it('is off by default even once unlocked', () => {
+    const state = createInitialState(0);
+    state.highestFloor = 40;
+    descend(state, 0);
+    expect(state.autoDelve).toBe(false);
+  });
+
+  it('survives a save round trip, and defaults off in an older save', () => {
+    const state = createInitialState(0);
+    state.autoDelve = true;
+    expect(decode(encode(state, 0), 0).state.autoDelve).toBe(true);
+
+    // A save written before the field existed must not enable it silently.
+    const older = JSON.stringify({ v: 1, floor: 3, highestFloor: 2, gold: '1,2' });
+    expect(decode(older, 0).state.autoDelve).toBe(false);
+  });
+
+  it('climbs floors while away, where a hero who never spends only banks gold', () => {
+    const eightHours = 8 * 60 * 60 * 1000;
+
+    const manual = createInitialState(0);
+    manual.upgrades.blade = 12;
+    manual.stats.descents = 1;
+
+    const automatic = createInitialState(0);
+    automatic.upgrades.blade = 12;
+    automatic.stats.descents = 1;
+    automatic.autoDelve = true;
+
+    applyOfflineProgress(manual, eightHours);
+    applyOfflineProgress(automatic, eightHours);
+
+    expect(automatic.highestFloor).toBeGreaterThan(manual.highestFloor);
+  });
+
+  it('reaches the same place offline as it would have watched', () => {
+    // The reason the offline path reuses the live interval rather than a
+    // cheaper one: leaving the tab open and closing it must not differ.
+    const away = createInitialState(0);
+    away.autoDelve = true;
+    away.stats.descents = 1;
+
+    const watched = createInitialState(0);
+    watched.autoDelve = true;
+    watched.stats.descents = 1;
+
+    applyOfflineProgress(away, 2 * 60 * 60 * 1000);
+    autoplay(watched, 2 * 60 * 60);
+
+    expect(away.highestFloor).toBe(watched.highestFloor);
+    expect(away.gold.serialise()).toBe(watched.gold.serialise());
   });
 });

@@ -30,6 +30,11 @@ export const ko: Record<StringKey, string> = {
   'boost.blessing': '▶ 축복 · {minutes}분간 2배',
   'boost.chest': '▶ 상자 · {amount}',
 
+  'shop.autoDelve': '자동 강화',
+  'shop.autoDelveOn': '켬',
+  'shop.autoDelveOff': '끔',
+  'shop.autoDelveHint': '가장 싼 강화를 자동으로 구매합니다. 자리를 비운 동안에도 작동합니다.',
+  'shop.autoDelveLocked': '첫 하강 이후 열립니다.',
   'shop.level': 'Lv {n}',
   'shop.maxed': '최대',
   'shop.quantityMax': '최대',

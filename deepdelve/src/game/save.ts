@@ -61,6 +61,7 @@ export function encode(state: GameState, now = Date.now()): string {
     upgrades: state.upgrades,
     companions: state.companions,
     blessingRemaining: state.blessingRemaining,
+    autoDelve: state.autoDelve,
     stats: state.stats,
     lastSeen: now,
   };
@@ -107,6 +108,9 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
   state.relics = asDecimal(migrated.relics);
   state.lifetimeRelics = asDecimal(migrated.lifetimeRelics).max(state.relics);
   state.blessingRemaining = Math.max(0, asFiniteNumber(migrated.blessingRemaining, 0));
+  // Absent in saves written before Auto-Delve existed, which is why every field
+  // is read with a default rather than assumed present.
+  state.autoDelve = migrated.autoDelve === true;
 
   const health = asDecimal(migrated.enemyHealthRemaining);
   // A zero here would be indistinguishable from an enemy at death's door, which

@@ -74,7 +74,28 @@ export interface AdvanceReport {
   readonly truncated: boolean;
 }
 
-function emptyReport(state: GameState): AdvanceReport {
+/**
+ * Sums two consecutive reports into one.
+ *
+ * Used where the simulation is run in slices — the offline catch-up interleaves
+ * it with shopping — so the caller still sees a single account of what happened
+ * rather than a list to add up itself.
+ */
+export function mergeReports(first: AdvanceReport, second: AdvanceReport): AdvanceReport {
+  return {
+    seconds: first.seconds + second.seconds,
+    goldEarned: first.goldEarned.add(second.goldEarned),
+    damageDealt: first.damageDealt.add(second.damageDealt),
+    kills: first.kills + second.kills,
+    guardiansFelled: first.guardiansFelled + second.guardiansFelled,
+    guardiansEscaped: first.guardiansEscaped + second.guardiansEscaped,
+    startFloor: first.startFloor,
+    endFloor: second.endFloor,
+    truncated: first.truncated || second.truncated,
+  };
+}
+
+export function emptyReport(state: GameState): AdvanceReport {
   return {
     seconds: 0,
     goldEarned: Decimal.ZERO,

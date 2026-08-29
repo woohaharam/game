@@ -10,6 +10,7 @@ import type { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
 import type { SoundName } from '@platform/audio';
 import type { Purchase } from '@game/shop';
+import { canAutoDelve } from '@game/prestige';
 import type { GameState } from '@game/state';
 import type { ShopEntry } from '../catalogue';
 import { el, setDisabled, setHidden, setText, setToggle } from '../dom';
@@ -31,11 +32,15 @@ export interface ShopPanelDeps {
   /** How many levels the current quantity setting asks for. */
   readonly wantedLevels: () => number;
   readonly sound: (name: SoundName) => void;
+  /** Present only on the panel that hosts the Auto-Delve toggle. */
+  readonly onToggleAutoDelve?: (() => void) | undefined;
 }
 
 export class ShopPanel {
   private readonly rows = new Map<string, Row>();
   private root: HTMLElement | null = null;
+  private autoButton: HTMLButtonElement | null = null;
+  private autoHint: HTMLElement | null = null;
 
   constructor(
     private readonly entries: readonly ShopEntry[],
@@ -45,9 +50,43 @@ export class ShopPanel {
   /** Builds the rows. `header` is prepended, for a panel that needs a hint. */
   mount(header?: HTMLElement): HTMLElement {
     const rows = this.entries.map((entry) => this.buildRow(entry));
-    const children = header === undefined ? rows : [header, ...rows];
-    this.root = el('div', { class: 'rows' }, children);
+    const before: HTMLElement[] = [];
+    if (header !== undefined) before.push(header);
+
+    const auto = this.buildAutoDelve();
+    if (auto !== null) before.push(auto);
+
+    this.root = el('div', { class: 'rows' }, [...before, ...rows]);
     return this.root;
+  }
+
+  private buildAutoDelve(): HTMLElement | null {
+    const onToggle = this.deps.onToggleAutoDelve;
+    if (onToggle === undefined) return null;
+
+    this.autoButton = el('button', { class: 'auto-toggle', type: 'button' }, ['']);
+    this.autoButton.addEventListener('click', () => onToggle());
+
+    this.autoHint = el('span', { class: 'auto-hint' }, ['']);
+
+    return el('div', { class: 'auto-delve' }, [
+      el('span', { class: 'auto-label' }, [t('shop.autoDelve')]),
+      this.autoHint,
+      this.autoButton,
+    ]);
+  }
+
+  private updateAutoDelve(state: GameState): void {
+    if (this.autoButton === null || this.autoHint === null) return;
+
+    const unlocked = canAutoDelve(state);
+    setDisabled(this.autoButton, !unlocked);
+    setText(
+      this.autoButton,
+      t(state.autoDelve && unlocked ? 'shop.autoDelveOn' : 'shop.autoDelveOff'),
+    );
+    setToggle(this.autoButton, 'on', unlocked && state.autoDelve);
+    setText(this.autoHint, unlocked ? t('shop.autoDelveHint') : t('shop.autoDelveLocked'));
   }
 
   private buildRow(entry: ShopEntry): HTMLElement {
@@ -80,6 +119,7 @@ export class ShopPanel {
 
   update(): void {
     const state = this.deps.state;
+    this.updateAutoDelve(state);
 
     for (const entry of this.entries) {
       const row = this.rows.get(entry.key);

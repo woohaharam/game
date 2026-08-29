@@ -15,6 +15,7 @@
  *    clock drifts backwards is not punished.
  */
 
+import { autoplay } from './autoplay';
 import { advance, type AdvanceReport } from './simulation';
 import type { GameState } from './state';
 
@@ -50,7 +51,13 @@ export function applyOfflineProgress(state: GameState, now = Date.now()): Offlin
   const heldBlessing = state.blessingRemaining;
   state.blessingRemaining = 0;
 
-  const report = advance(state, creditedSeconds);
+  // With Auto-Delve on, the hero shops while away, which is the whole reason
+  // the unlock is worth having: gold that is never spent stops buying floors.
+  // It runs the same interleave the live loop does, at the same interval, so
+  // eight hours away still lands where eight hours watched would have.
+  const report = state.autoDelve
+    ? autoplay(state, creditedSeconds).report
+    : advance(state, creditedSeconds);
 
   state.blessingRemaining = heldBlessing;
   state.lastSeen = now;

@@ -55,6 +55,7 @@ export interface ViewCallbacks {
   readonly isSoundOn: () => boolean;
   readonly onExportSave: () => void;
   readonly onImportSave: () => void;
+  readonly onToggleAutoDelve: () => void;
 }
 
 /** What survives a rebuild, so a language switch does not feel like a reset. */
@@ -100,7 +101,12 @@ export class GameView {
       onWatchForChest: callbacks.onWatchForChest,
     });
     const shopDeps = { state, num, wantedLevels, sound: callbacks.sound };
-    this.upgrades = new ShopPanel(upgradeEntries(), shopDeps);
+    // The toggle lives on the upgrades panel because that is what it automates;
+    // companions are bought rarely and deliberately.
+    this.upgrades = new ShopPanel(upgradeEntries(), {
+      ...shopDeps,
+      onToggleAutoDelve: callbacks.onToggleAutoDelve,
+    });
     this.party = new ShopPanel(companionEntries(), shopDeps);
     this.descend = new DescendPanel({
       state,

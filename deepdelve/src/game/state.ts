@@ -44,6 +44,16 @@ export interface GameState {
   /** Seconds of doubled output remaining from a watched advertisement. */
   blessingRemaining: number;
 
+  /**
+   * Whether the hero spends gold without being asked.
+   *
+   * Unlocked by the first descent, which is the point where re-buying the same
+   * early upgrades stops being a decision and starts being a chore. Off by
+   * default even once unlocked: a player who wants to spend deliberately should
+   * not have that taken away.
+   */
+  autoDelve: boolean;
+
   stats: RunStatistics;
   /** Epoch milliseconds of the last save, used to compute offline progress. */
   lastSeen: number;
@@ -77,6 +87,7 @@ export function createInitialState(now = Date.now()): GameState {
     upgrades: emptyUpgrades(),
     companions: emptyCompanions(),
     blessingRemaining: 0,
+    autoDelve: false,
     stats: {
       totalKills: 0,
       guardiansFelled: 0,

@@ -13,7 +13,7 @@
  * fine, and one that stalls here needs looking at.
  */
 
-import { advance } from './simulation';
+import { advance, emptyReport, mergeReports, type AdvanceReport } from './simulation';
 import { spendGreedily } from './shop';
 import { canDescend, descend } from './prestige';
 import type { GameState } from './state';
@@ -30,6 +30,8 @@ export interface AutoplayResult {
   readonly purchases: number;
   readonly descents: number;
   readonly highestFloor: number;
+  /** Everything the underlying simulation did, summed across the slices. */
+  readonly report: AdvanceReport;
 }
 
 export function autoplay(
@@ -47,10 +49,11 @@ export function autoplay(
   let purchases = 0;
   let descents = 0;
   let deepest = state.highestFloor;
+  let report = emptyReport(state);
 
   while (played < seconds) {
     const step = Math.min(interval, seconds - played);
-    advance(state, step);
+    report = mergeReports(report, advance(state, step));
     played += step;
 
     purchases += spendGreedily(state);
@@ -62,5 +65,5 @@ export function autoplay(
     }
   }
 
-  return { secondsPlayed: played, purchases, descents, highestFloor: deepest };
+  return { secondsPlayed: played, purchases, descents, highestFloor: deepest, report };
 }
