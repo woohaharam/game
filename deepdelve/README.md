@@ -16,6 +16,9 @@ npm run dev       # development server
 npm run verify    # typecheck + unit tests
 npm run build     # production bundle
 npm run smoke     # end-to-end browser check (needs `npm run preview` running)
+npm run balance   # simulate twenty descents and print the pacing report
+npm run lint      # type-aware ESLint
+npm run format    # apply Prettier
 ```
 
 ## The decisions worth explaining
@@ -111,6 +114,11 @@ src/platform/  ad providers and portal adapters
 src/ui/        the view: built once, updated in place
 tools/         balance probe and the browser smoke check
 ```
+
+The reasoning behind the bigger decisions, and the invariants that are easy to
+break silently, are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The
+current measured pacing is in [`docs/BALANCE.md`](docs/BALANCE.md), regenerated
+by `npm run balance -- --write`.
 
 ## Publishing to a portal
 

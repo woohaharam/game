@@ -133,7 +133,7 @@ dialogScript.push(async (d) => {
 await page.click('.settings button:text-is("세이브 코드 복사")');
 await page.waitForTimeout(500);
 
-dialogScript.push(async (d) => d.accept('DD1.bogus.00000000'));
+dialogScript.push((d) => d.accept('DD1.bogus.00000000'));
 dialogScript.push(async (d) => {
   console.log('damaged code rejected with:', d.message());
   await d.accept();
@@ -142,7 +142,12 @@ await page.click('.settings button:text-is("세이브 코드 불러오기")');
 await page.waitForTimeout(700);
 
 // Accessibility surface.
-console.log('tabs with aria-selected:', await page.$$eval('nav.tabs [role="tab"]', (n) => n.map((x) => x.getAttribute('aria-selected')).join(',')));
+console.log(
+  'tabs with aria-selected:',
+  await page.$$eval('nav.tabs [role="tab"]', (n) =>
+    n.map((x) => x.getAttribute('aria-selected')).join(','),
+  ),
+);
 console.log('progressbars:', await page.$$eval('[role="progressbar"]', (n) => n.length));
 console.log('health aria-valuenow:', await page.getAttribute('.healthbar', 'aria-valuenow'));
 
