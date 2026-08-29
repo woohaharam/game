@@ -26,7 +26,13 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['eslint.config.js', 'tools/smoke.mjs'] },
+        projectService: {
+          // A glob rather than a list: `tools/` holds plain-JS scripts that are
+          // deliberately outside the app's type-check graph, and naming them one
+          // by one means every new one fails lint until someone remembers this
+          // file.
+          allowDefaultProject: ['eslint.config.js', 'tools/*.mjs'],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.browser },
