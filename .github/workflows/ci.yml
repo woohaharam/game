@@ -76,36 +76,15 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npx vite build
+      - run: npm run build
 
-      - name: Check bundle size budget
-        # The game ships one self-contained bundle with no art or audio assets,
-        # so a jump in size means something was pulled in by accident. The
-        # budget is roughly 3x the current build — loose enough not to nag,
-        # tight enough to catch an errant dependency.
+      # The bundle is the product on a game portal: it is downloaded before
+      # anything is playable, over connections the player did not choose. A
+      # regression here is a retention problem, so it fails the build rather
+      # than being noticed later.
+      - name: Bundle budget
         run: |
-          set -euo pipefail
-          bytes=$(cat dist/assets/*.js | wc -c)
-          gzipped=$(cat dist/assets/*.js | gzip -9 | wc -c)
-          budget=256000
-
-          {
-            echo "### Bundle size"
-            echo ""
-            echo "| Metric | Size | Budget |"
-            echo "| --- | ---: | ---: |"
-            echo "| Raw | $((bytes / 1024)) KB | $((budget / 1024)) KB |"
-            echo "| Gzipped | $((gzipped / 1024)) KB | — |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$bytes" -gt "$budget" ]; then
-            echo "::error::Bundle is ${bytes} bytes, over the ${budget} byte budget"
-            exit 1
-          fi
-
-      - name: Upload build
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist
-          retention-days: 7
+          BYTES=$(cat dist/assets/*.js dist/assets/*.css | gzip -9 | wc -c)
+          LIMIT=$((150 * 1024))
+          echo "gzipped bundle: $BYTES bytes (limit $LIMIT)"
+          test "$BYTES" -le "$LIMIT"

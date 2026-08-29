@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "node"],
+    "types": ["vite/client"],
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -20,9 +20,11 @@
     "noEmit": true,
 
     "paths": {
-      "@engine/*": ["./src/engine/*"],
-      "@game/*": ["./src/game/*"]
+      "@core/*": ["./src/core/*"],
+      "@game/*": ["./src/game/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@platform/*": ["./src/platform/*"]
     }
   },
-  "include": ["src", "tests", "tools", "vite.config.ts"]
+  "include": ["src", "tests", "tools", "vite.config.ts", "eslint.config.js"]
 }

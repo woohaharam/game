@@ -1,103 +1,151 @@
-# Two games, built from scratch in TypeScript
-
-[![CI](https://github.com/woohaharam/game/actions/workflows/ci.yml/badge.svg)](https://github.com/woohaharam/game/actions/workflows/ci.yml)
-[![DeepDelve](https://github.com/woohaharam/game/actions/workflows/deepdelve.yml/badge.svg)](https://github.com/woohaharam/game/actions/workflows/deepdelve.yml)
-[![Deploy](https://github.com/woohaharam/game/actions/workflows/deploy.yml/badge.svg)](https://github.com/woohaharam/game/actions/workflows/deploy.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
-
-Two complete browser games, sharing a repository and nothing else. Both are
-written in strict TypeScript with **no game framework and no downloaded
-assets** — every shape is drawn at runtime and every sound is synthesised — and
-both are small enough to load over a phone connection.
-
-They are deliberately different problems. One is a real-time action game where
-the hard parts are determinism, collision, and frame budget. The other is an
-idle game where the hard parts are arithmetic that survives 1e1000, progression
-curves that provably do not stall, and a commercial layer that a game portal
-will accept.
-
----
-
-## Neon Depths — a 2D action roguelike
-
-**▶ [Play it](https://woohaharam.github.io/game/)** · [Full README](docs/NEON_DEPTHS.md)
-· [Architecture](docs/ARCHITECTURE.md) · [Balance report](docs/BALANCE.md)
-
-Procedurally generated dungeons, twin-stick combat, and a run-scoped upgrade
-system on a custom engine. A single 32-bit seed reproduces an entire run
-exactly, which is what makes the replay system possible: runs are recorded as
-_decisions_, not frames, and re-simulated on playback.
-
-What it demonstrates:
-
-| Area                      | What is in there                                                                                                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Game loop**             | Fixed timestep with rendering interpolation and a spiral-of-death guard, so hit detection behaves identically at 30, 60 and 144 Hz                                       |
-| **Procedural generation** | Room graph grown as a branching tree, then carved into tiles, with a flood-fill pass that guarantees no seed can produce unreachable geometry                            |
-| **Determinism**           | Separate gameplay and cosmetic RNG streams, and `Math.hypot`/`pow`/`exp` removed from the simulation after JIT tier differences made replays diverge on one Node version |
-| **Performance**           | Object pooling, a uniform-grid spatial hash broadphase, viewport culling on a 200,000-tile map. ~1.1 ms/frame with hundreds of live projectiles                          |
-| **Replays**               | Seed plus quantised intents in a binary codec — varints, zig-zag, packed header bits — replayed by re-simulation rather than playback                                    |
-| **Balance tooling**       | A headless bot plays hundreds of runs in CI to produce a balance report, rather than tuning by feel                                                                      |
-
-## DeepDelve — an idle fantasy dungeon RPG
-
-[README](deepdelve/README.md) · [Architecture](deepdelve/docs/ARCHITECTURE.md)
-· [Balance report](deepdelve/docs/BALANCE.md)
-
-A hero descends floor by floor and keeps fighting while the tab is closed. Built
-for web game portals, where the revenue model is the portal's ad share — which
-is what shapes the whole build: no backend, no accounts, a relative asset base
-so it runs from any subdirectory, and a game that stays complete for someone who
-never watches an ad. Ships in Korean and English.
-
-What it demonstrates:
-
-| Area                     | What is in there                                                                                                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Arithmetic**           | A mantissa/exponent big number, because idle progression passes 2^53 in hours and 1.8e308 in days, and both failures are silent until a save is ruined                                 |
-| **One simulation**       | The frame loop and the eight-hour offline catch-up call the same function, so they cannot disagree — which forces it to be O(events), not O(ticks)                                     |
-| **Provable progression** | Descent gains are governed by `log(relicGrowth)/log(healthGrowth)`; below 1 the runs converge on a fixed depth and the game silently ends. The test asserts the ratio, not the payout  |
-| **Monetisation**         | One ad interface with the portals' rules enforced in a decorator around it, and structurally-typed adapters that degrade to "no ads" rather than to "reward granted" when an SDK fails |
-| **Localisation**         | Korean groups numbers in fours (만·억·조), not threes, so the formatter holds significant digits rather than decimal places                                                            |
-| **Browser verification** | An end-to-end check that asserts rendered geometry, after two bugs shipped past a green unit suite                                                                                     |
-
----
-
-## Running them
-
-Each is an independent project with its own dependencies. Node 20 or newer.
-
-```bash
-# Neon Depths
-npm install && npm run dev
-
 # DeepDelve
-cd deepdelve && npm install && npm run dev
-```
 
-Both expose the same gate, which is exactly what their CI runs:
+An idle fantasy dungeon RPG for the browser. A hero descends floor by floor,
+fights without being told to, and keeps fighting while the tab is closed. When
+the run stalls — and every run stalls — you surrender it for relics that make
+the next one faster.
+
+Built to be published on web game portals (CrazyGames, Poki, itch.io), where the
+revenue model is the portal's ad share. That constraint shapes the whole build:
+no backend, no accounts, no payments, a bundle small enough to load over a phone
+connection, and a game that is complete for someone who never watches an ad.
 
 ```bash
-npm run verify     # format, lint, typecheck, tests
-npm run balance    # simulate progression and print a report
-npm run build      # production bundle
+npm install
+npm run dev       # development server
+npm run verify    # typecheck + unit tests
+npm run build     # production bundle
+npm run smoke     # end-to-end browser check (needs `npm run preview` running)
+npm run balance   # simulate twenty descents and print the pacing report
+npm run lint      # type-aware ESLint
+npm run format    # apply Prettier
 ```
 
-## How the work is done
+## The decisions worth explaining
 
-Everything lands on `main` through pull requests, with CI as a required signal.
-The conventions — commit format, branch naming, and the invariants that are easy
-to break silently — are in [`CONTRIBUTING.md`](CONTRIBUTING.md). Repository
-settings that cannot live in a commit are written down in
-[`docs/REPOSITORY_SETUP.md`](docs/REPOSITORY_SETUP.md).
+**One simulation, used twice.** `advance(state, seconds)` is the only thing that
+moves the game forward. The frame loop calls it with ~0.016; the offline
+catch-up calls it with up to eight hours. That is not tidiness — it is the only
+way the two can be guaranteed not to disagree. Idle games that estimate offline
+progress separately end up with a discrepancy, and the discrepancy is always an
+exploit: players work out whether it pays to close the tab, and the honest way
+to play stops being the best way to play.
 
-The two projects have separate CI workflows, scoped by path: a change to one has
-no bearing on the other, and neither should wait for the other's suite.
+Serving both from one function means it has to be O(events), not O(ticks). Eight
+hours at sixty ticks a second is 1.7 million iterations; eight hours of _events_
+is a few thousand, because kills at a constant rate can be counted with a
+division. Criticals are folded into DPS as an expectation rather than rolled,
+since a dice roll would make eight hours away disagree with eight hours watched
+by variance alone. The test suite asserts that one 7,200-second step and 28,800
+frame-sized steps produce identical kill counts and gold within 1e-9.
 
-Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).
-Security reports go through [`SECURITY.md`](SECURITY.md), not public issues.
+**Numbers that do not run out.** Idle progression passes 2^53 within hours and
+1.8e308 within days. Both failures are silent until a save is already ruined, so
+every quantity is a normalised mantissa and a base-10 exponent — about fifteen
+significant digits across a range of roughly 1e±1e308.
 
-## License
+**The relic curve was measured, not chosen.** Reachable depth goes as
+`log(multiplier)/log(healthGrowth)`, and the multiplier goes as
+`relicGrowth^depth`, so one descent maps to the next roughly linearly and the
+ratio of those two growth rates decides everything. Below the health growth the
+map is a contraction: it has a fixed point, runs converge on a single depth, and
+the game ends without saying so — at 1.36 a simulated player crawls from floor
+213 to floor 228 across twenty descents and stops. At 1.75 the gains multiply
+and floor 4,000 arrives inside two days. At 1.58 the gain climbs steadily from
++19 floors to +170 across 24 descents and never plateaus. `tests/save.test.ts`
+asserts the _ratio_ rather than the payout, because the payout can be retuned
+freely and the ratio cannot.
 
-MIT — see [`LICENSE`](LICENSE).
+**Advertising rules live in one place.** Portals largely agree: rewarded ads
+opt-in, interstitials infrequent, audio stopped while an ad runs, and the game
+completable without any of it. Those are enforced in a decorator wrapped around
+every provider rather than at each call site — a rule enforced at the call site
+is one that gets forgotten at the next call site. Each portal SDK is a small
+structurally-typed adapter; nothing outside `src/platform` names a portal. The
+SDKs arrive as globals injected around the build, so every method is
+feature-detected, and an SDK that is missing, half-built, or throwing degrades
+to "no ads available" — never to "reward granted".
+
+## What the browser caught that the tests did not
+
+Two bugs shipped past a green suite and were found by
+[`tools/smoke.mjs`](tools/smoke.mjs), which is why that script asserts against
+rendered geometry rather than DOM properties:
+
+- Every panel rendered at once. `hidden` is only a UA-stylesheet `display:none`,
+  so the explicit `display: grid` on `.panel` silently beat it. Setting
+  `.hidden = true` appeared to work and changed nothing.
+- The first nine and a half seconds of the game showed a health bar moving and
+  nothing else — no kill, no gold, no reason to stay. A portal player decides in
+  less time than that.
+
+## Auto-Delve
+
+Unlocked by the first descent, off by default. Before that point, deciding what
+to buy _is_ the game — the loop is a player learning which curve pays.
+Afterwards, re-buying the same early upgrades on every run is a chore, and
+automating it is the genre's standard answer.
+
+It matters most while the tab is closed. Without it, offline time banks gold
+that is never spent, so the hero never gets stronger and never climbs. With it,
+the offline catch-up runs the same interleave the live loop does, at the same
+interval, for the same reason everything else in the game shares one path:
+leaving the tab open and closing it must not end anywhere different.
+
+## Korean, and what localisation actually costs
+
+The game ships in Korean and English, detected from `?lang=`, then the browser,
+with a toggle that persists outside the save — erasing a run should not drop a
+player back into a language they cannot read.
+
+The interesting part is not the string table. It is that **Korean groups large
+numbers in fours, not threes**: 만 is 10^4, 억 is 10^8, 조 is 10^12. Rendering
+12,345 as `12.34K` asks a Korean reader to stop and convert; `1.234만` is simply
+read. Within a Korean unit the magnitude spans three orders rather than two, so
+the formatter holds four _significant digits_ instead of a fixed decimal count —
+1.234만, 12.34만, 123.4만, 1234만 — and names units as deep as Korean actually
+names them, through 극 (10^48) and the Buddhist series to 무량대수 (10^68),
+before falling back to an exponent.
+
+Two smaller things that are easy to miss: `word-break: keep-all`, because Korean
+otherwise breaks mid-word and a two-word phrase splits down its middle; and
+`system-ui` first in the font stack, so each platform reaches for its own Hangul
+face rather than a Latin font falling back to whatever has coverage.
+
+Content is translated rather than transliterated — 무덤쥐 and 잉걸불 심층, not
+phonetic renderings of "Crypt Rat" and "Ember Deep", which read as noise. Tests
+assert that the two key sets match exactly, that no Korean value passes English
+through, and that every `{placeholder}` survives translation, since a dropped
+one shows the player a sentence with a hole in it.
+
+## Layout
+
+```
+src/core/      Decimal, formatting, i18n, storage — no game knowledge
+src/game/      simulation, state, content tables, saves, prestige
+src/platform/  ad providers and portal adapters
+src/ui/        the view: built once, updated in place
+tools/         balance probe and the browser smoke check
+```
+
+The reasoning behind the bigger decisions, and the invariants that are easy to
+break silently, are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The
+current measured pacing is in [`docs/BALANCE.md`](docs/BALANCE.md), regenerated
+by `npm run balance -- --write`.
+
+## Publishing to a portal
+
+```bash
+npm run build              # no SDK — GitHub Pages, itch.io, local
+npm run build:crazygames   # CrazyGames submission
+npm run build:poki         # Poki submission
+```
+
+The build is fully relative (`base: './'`), so it runs from any subdirectory.
+Each portal target injects that portal's SDK script; `detectAdProvider` finds
+the global at boot, waits for the SDK's own async initialisation, and falls back
+to no ads when there is nothing there. `?ads=debug` grants rewards instantly for
+local testing and is never selected automatically.
+
+How the revenue actually works, what to expect from it, and the pre-submission
+checklist are in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
