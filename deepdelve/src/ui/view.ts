@@ -19,11 +19,12 @@
 import type { Decimal } from '@core/decimal';
 import { formatMultiplier, formatNumber, type Notation } from '@core/format';
 import { t, type Locale } from '@core/i18n';
+import type { SoundName } from '@platform/audio';
 import { computeStats } from '@game/stats';
 import type { GameState } from '@game/state';
 import { companionEntries, upgradeEntries } from './catalogue';
 import { el, setHidden, setText, setToggle } from './dom';
-import { CombatPanel } from './panels/combat';
+import { CombatPanel, type FrameFeedback } from './panels/combat';
 import { DescendPanel } from './panels/descend';
 import { OfflineModal, type OfflineSummary } from './panels/offline';
 import { ShopPanel } from './panels/shop';
@@ -40,6 +41,8 @@ const TABS = ['delve', 'party', 'descend'] as const;
 type Tab = (typeof TABS)[number];
 
 export interface ViewCallbacks {
+  /** Plays an effect. The view never touches the audio device itself. */
+  readonly sound: (name: SoundName) => void;
   readonly onDescend: () => void;
   /** The view cannot retranslate itself in place; the host rebuilds it. */
   readonly onLanguageChange: (locale: Locale) => void;
@@ -48,6 +51,8 @@ export interface ViewCallbacks {
   readonly onDismissOffline: () => void;
   readonly onDoubleOffline: () => void;
   readonly onWipe: () => void;
+  readonly onToggleSound: () => void;
+  readonly isSoundOn: () => boolean;
 }
 
 /** What survives a rebuild, so a language switch does not feel like a reset. */
@@ -88,11 +93,13 @@ export class GameView {
     this.combat = new CombatPanel({
       state,
       num,
+      sound: callbacks.sound,
       onWatchForBlessing: callbacks.onWatchForBlessing,
       onWatchForChest: callbacks.onWatchForChest,
     });
-    this.upgrades = new ShopPanel(upgradeEntries(), { state, num, wantedLevels });
-    this.party = new ShopPanel(companionEntries(), { state, num, wantedLevels });
+    const shopDeps = { state, num, wantedLevels, sound: callbacks.sound };
+    this.upgrades = new ShopPanel(upgradeEntries(), shopDeps);
+    this.party = new ShopPanel(companionEntries(), shopDeps);
     this.descend = new DescendPanel({
       state,
       num,
@@ -101,6 +108,8 @@ export class GameView {
       onCycleNotation: () => this.cycleNotation(),
       onLanguageChange: callbacks.onLanguageChange,
       onWipe: callbacks.onWipe,
+      onToggleSound: callbacks.onToggleSound,
+      isSoundOn: callbacks.isSoundOn,
     });
     this.offline = new OfflineModal({
       num,
@@ -142,6 +151,16 @@ export class GameView {
 
   markOfflineDoubled(): void {
     this.offline.markDoubled();
+  }
+
+  /** Hands one frame of simulation to the panel that can show it. */
+  applyFeedback(feedback: FrameFeedback): void {
+    this.combat.feedback(feedback);
+  }
+
+  /** A one-off announcement over the stage, for events with no frame report. */
+  announce(text: string): void {
+    this.combat.announce(text);
   }
 
   // -- construction ---------------------------------------------------------

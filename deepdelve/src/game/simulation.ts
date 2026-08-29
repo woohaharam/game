@@ -56,6 +56,15 @@ export interface AdvanceReport {
   /** Simulated seconds actually consumed. */
   readonly seconds: number;
   readonly goldEarned: Decimal;
+  /**
+   * Health removed over the call.
+   *
+   * Reported rather than left for the view to re-derive from DPS × time,
+   * because those two disagree: the kill-rate cap means a hero far beyond the
+   * floor deals less than their damage per second suggests. A floating number
+   * that says otherwise is a lie the player can check against the health bar.
+   */
+  readonly damageDealt: Decimal;
   readonly kills: number;
   readonly guardiansFelled: number;
   readonly guardiansEscaped: number;
@@ -69,6 +78,7 @@ function emptyReport(state: GameState): AdvanceReport {
   return {
     seconds: 0,
     goldEarned: Decimal.ZERO,
+    damageDealt: Decimal.ZERO,
     kills: 0,
     guardiansFelled: 0,
     guardiansEscaped: 0,
@@ -110,9 +120,12 @@ function timeToKill(health: Decimal, rate: Decimal): number {
   return seconds;
 }
 
-function applyDamageOverTime(state: GameState, rate: Decimal, seconds: number): void {
+/** Applies damage and returns how much actually landed, after the zero clamp. */
+function applyDamageOverTime(state: GameState, rate: Decimal, seconds: number): Decimal {
+  const before = state.enemyHealthRemaining;
   const dealt = rate.multiply(Decimal.of(seconds, 0));
-  state.enemyHealthRemaining = state.enemyHealthRemaining.subtract(dealt).max(Decimal.ZERO);
+  state.enemyHealthRemaining = before.subtract(dealt).max(Decimal.ZERO);
+  return before.subtract(state.enemyHealthRemaining);
 }
 
 export function advance(state: GameState, seconds: number): AdvanceReport {
@@ -124,6 +137,7 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
 
   let remaining = seconds;
   let goldEarned = Decimal.ZERO;
+  let damageDealt = Decimal.ZERO;
   let kills = 0;
   let guardiansFelled = 0;
   let guardiansEscaped = 0;
@@ -146,6 +160,7 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
 
       if (killTime <= window) {
         remaining -= killTime;
+        damageDealt = damageDealt.add(state.enemyHealthRemaining);
         award(guardianGold(state.floor), 1);
         guardiansFelled += 1;
         kills += 1;
@@ -166,7 +181,7 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
       }
 
       // The caller's budget expires mid-fight; carry the partial state forward.
-      applyDamageOverTime(state, rate, remaining);
+      damageDealt = damageDealt.add(applyDamageOverTime(state, rate, remaining));
       state.guardianTimeRemaining -= remaining;
       remaining = 0;
       continue;
@@ -177,12 +192,13 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
     const trashRate = effectiveDamageRate(dps, monsterHealth(state.floor));
     const firstKillTime = timeToKill(state.enemyHealthRemaining, trashRate);
     if (firstKillTime > remaining) {
-      applyDamageOverTime(state, trashRate, remaining);
+      damageDealt = damageDealt.add(applyDamageOverTime(state, trashRate, remaining));
       remaining = 0;
       continue;
     }
 
     remaining -= firstKillTime;
+    damageDealt = damageDealt.add(state.enemyHealthRemaining);
     kills += 1;
     state.stats.totalKills += 1;
     state.killsOnFloor += 1;
@@ -203,6 +219,7 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
 
     if (batch > 0) {
       remaining -= batch * perKill;
+      damageDealt = damageDealt.add(monsterHealth(state.floor).multiply(Decimal.of(batch, 0)));
       kills += batch;
       state.stats.totalKills += batch;
       state.killsOnFloor += batch;
@@ -224,6 +241,7 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
   return {
     seconds: consumed,
     goldEarned,
+    damageDealt,
     kills,
     guardiansFelled,
     guardiansEscaped,

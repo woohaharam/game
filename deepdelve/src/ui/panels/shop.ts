@@ -8,6 +8,7 @@
 
 import type { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
+import type { SoundName } from '@platform/audio';
 import type { Purchase } from '@game/shop';
 import type { GameState } from '@game/state';
 import type { ShopEntry } from '../catalogue';
@@ -29,6 +30,7 @@ export interface ShopPanelDeps {
   readonly num: (value: Decimal | number) => string;
   /** How many levels the current quantity setting asks for. */
   readonly wantedLevels: () => number;
+  readonly sound: (name: SoundName) => void;
 }
 
 export class ShopPanel {
@@ -54,7 +56,11 @@ export class ShopPanel {
     const quantity = el('span', { class: 'qty' }, ['']);
     const button = el('button', { class: 'buy', type: 'button' }, [cost, quantity]);
     button.addEventListener('click', () => {
+      const before = entry.level(this.deps.state);
       entry.buy(this.deps.state, this.deps.wantedLevels());
+      // Only on a purchase that actually happened: a disabled-looking button
+      // that still makes a noise teaches the player the wrong thing.
+      if (entry.level(this.deps.state) > before) this.deps.sound('purchase');
     });
 
     const name = el('span', { class: 'label' }, ['']);

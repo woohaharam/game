@@ -22,6 +22,8 @@ export interface DescendPanelDeps {
   readonly onCycleNotation: () => void;
   readonly onLanguageChange: (locale: Locale) => void;
   readonly onWipe: () => void;
+  readonly onToggleSound: () => void;
+  readonly isSoundOn: () => boolean;
 }
 
 export class DescendPanel {
@@ -31,6 +33,7 @@ export class DescendPanel {
   private statList!: HTMLElement;
   private notationButton!: HTMLElement;
   private languageButton!: HTMLElement;
+  private soundButton!: HTMLElement;
   /** Built once, then written through; the row count never changes. */
   private statValues: HTMLElement[] = [];
 
@@ -51,6 +54,9 @@ export class DescendPanel {
       this.deps.onLanguageChange(getLocale() === 'ko' ? 'en' : 'ko');
     });
 
+    this.soundButton = el('button', { class: 'quiet', type: 'button' }, ['']);
+    this.soundButton.addEventListener('click', () => this.deps.onToggleSound());
+
     this.pending = el('strong', {}, ['0']);
     this.hint = el('p', { class: 'lock' }, ['']);
     this.statList = el('dl', { class: 'stats' });
@@ -67,7 +73,12 @@ export class DescendPanel {
         this.button,
       ]),
       el('div', { class: 'stats-card' }, [el('h3', {}, [t('stats.title')]), this.statList]),
-      el('div', { class: 'settings' }, [this.languageButton, this.notationButton, wipe]),
+      el('div', { class: 'settings' }, [
+        this.languageButton,
+        this.notationButton,
+        this.soundButton,
+        wipe,
+      ]),
     ]);
   }
 
@@ -89,6 +100,10 @@ export class DescendPanel {
       t('settings.notation', { mode: t(`notation.${this.deps.notation()}`) }),
     );
     setText(this.languageButton, t('settings.language'));
+    setText(
+      this.soundButton,
+      t(this.deps.isSoundOn() ? 'settings.soundOn' : 'settings.soundOff'),
+    );
 
     const stats = state.stats;
     const lines: [string, string][] = [

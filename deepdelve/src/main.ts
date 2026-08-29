@@ -20,15 +20,29 @@ import {
   LOCALE_STORAGE_KEY,
   type Locale,
 } from '@core/i18n';
-import type { Notation } from '@core/format';
+import { formatNumber, type Notation } from '@core/format';
 import { createStore } from '@core/storage';
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
 import { canDescend, descend } from '@game/prestige';
 import { grantBlessing, grantChest } from '@game/rewards';
 import { load, save, wipe } from '@game/save';
 import { advance } from '@game/simulation';
+import { GameAudio } from '@platform/audio';
 import { detectAdProvider } from '@platform/portals';
 import { GameView } from '@ui/view';
+import type { FrameFeedback } from '@ui/panels/combat';
+import { Decimal } from '@core/decimal';
+
+function emptyFeedback(floor: number): FrameFeedback {
+  return {
+    damage: Decimal.ZERO,
+    gold: Decimal.ZERO,
+    kills: 0,
+    guardiansFelled: 0,
+    floorsCleared: 0,
+    floor,
+  };
+}
 
 /**
  * Longest frame delta trusted as a real frame.
@@ -57,14 +71,21 @@ function boot(): void {
   const loaded = load(store);
   const state = loaded.state;
 
+  // Sound defaults on, which is what a portal player expects; the choice is
+  // remembered separately from the save, like the other preferences.
+  const audio = new GameAudio(store.read('deepdelve.sound') !== 'off');
+
   let paused = false;
   const provider = detectAdProvider(globalThis, {
     onAdStart: () => {
       paused = true;
+      // Portals check this: an advertisement must not play over game audio.
+      audio.suspend();
       provider.gameplayStop();
     },
     onAdEnd: () => {
       paused = false;
+      audio.resume();
       // The clock kept running behind the ad; hand that time to the offline
       // path rather than to the next frame delta.
       reconcile();
@@ -77,6 +98,7 @@ function boot(): void {
   // Preferences live outside the save: erasing a run should not drop the player
   // back into a language they cannot read.
   const NOTATION_KEY = 'deepdelve.notation';
+  const SOUND_KEY = 'deepdelve.sound';
   const locale = detectLocale({
     stored: store.read(LOCALE_STORAGE_KEY),
     search: globalThis.location.search,
@@ -93,11 +115,21 @@ function boot(): void {
       : defaultNotation(locale);
 
   const callbacks = {
+    sound: (name: Parameters<typeof audio.play>[0]) => audio.play(name),
+    onToggleSound: () => {
+      audio.setEnabled(!audio.isEnabled());
+      store.write(SOUND_KEY, audio.isEnabled() ? 'on' : 'off');
+      if (audio.isEnabled()) audio.unlock();
+    },
+    isSoundOn: () => audio.isEnabled(),
     onDescend: () => {
       if (!canDescend(state)) return;
       const confirmed = globalThis.confirm(t('descend.confirm'));
       if (!confirmed) return;
-      descend(state);
+
+      const result = descend(state);
+      audio.play('descend');
+      view.announce(t('effect.descended', { relics: formatNumber(result.relicsGained) }));
       save(store, state);
       // A descent is the natural break in the session: the run just ended, and
       // nothing is interrupted. It is the only place an interstitial belongs.
@@ -105,12 +137,16 @@ function boot(): void {
     },
     onWatchForBlessing: () => {
       void provider.showRewarded('blessing').then((outcome) => {
-        if (outcome.granted) grantBlessing(state);
+        if (!outcome.granted) return;
+        grantBlessing(state);
+        audio.play('reward');
       });
     },
     onWatchForChest: () => {
       void provider.showRewarded('chest').then((outcome) => {
-        if (outcome.granted) grantChest(state);
+        if (!outcome.granted) return;
+        grantChest(state);
+        audio.play('reward');
       });
     },
     onDismissOffline: () => {
@@ -123,6 +159,7 @@ function boot(): void {
       void provider.showRewarded('offline-double').then((outcome) => {
         if (!outcome.granted) return;
         doubleOfflineEarnings(state, result);
+        audio.play('reward');
         view.markOfflineDoubled();
       });
     },
@@ -183,6 +220,16 @@ function boot(): void {
   let lastRenderAt = 0;
   let lastSaveAt = performance.now();
 
+  /**
+   * What the simulation has done since the last rendered frame.
+   *
+   * The loop runs at the display's rate and the interface repaints at twenty a
+   * second, so several frames of simulation collapse into one repaint.
+   * Accumulating rather than sampling means a kill that happened between
+   * repaints still produces a number, instead of being silently dropped.
+   */
+  let pending: FrameFeedback = emptyFeedback(state.floor);
+
   function frame(now: number): void {
     requestAnimationFrame(frame);
 
@@ -192,11 +239,23 @@ function boot(): void {
     if (!paused) {
       // Anything longer than a frame means the tab was asleep. Dropping it here
       // is safe because `reconcile` on the visibility change credits it in full.
-      if (delta > 0 && delta <= MAX_FRAME_SECONDS) advance(state, delta);
+      if (delta > 0 && delta <= MAX_FRAME_SECONDS) {
+        const report = advance(state, delta);
+        pending = {
+          damage: pending.damage.add(report.damageDealt),
+          gold: pending.gold.add(report.goldEarned),
+          kills: pending.kills + report.kills,
+          guardiansFelled: pending.guardiansFelled + report.guardiansFelled,
+          floorsCleared: pending.floorsCleared + (report.endFloor - report.startFloor),
+          floor: state.floor,
+        };
+      }
     }
 
     if (now - lastRenderAt >= RENDER_INTERVAL_MS) {
       lastRenderAt = now;
+      view.applyFeedback(pending);
+      pending = emptyFeedback(state.floor);
       view.update();
     }
 
@@ -221,6 +280,14 @@ function boot(): void {
   globalThis.addEventListener('pagehide', () => {
     save(store, state);
   });
+
+  // Browsers refuse to start an AudioContext without a gesture, so the first
+  // touch or click anywhere is what makes sound possible. Once is enough.
+  const unlockAudio = (): void => {
+    audio.unlock();
+    root.removeEventListener('pointerdown', unlockAudio);
+  };
+  root.addEventListener('pointerdown', unlockAudio);
 
   provider.loadingFinished();
   provider.gameplayStart();

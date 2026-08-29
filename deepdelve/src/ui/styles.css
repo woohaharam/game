@@ -204,8 +204,109 @@ button:disabled {
   }
 }
 
+.stage.struck {
+  /* A single frame of brightness reads as impact without moving the layout. */
+  animation: struck 140ms ease-out;
+}
+
+@keyframes struck {
+  0% {
+    filter: brightness(1.9) saturate(0.6);
+  }
+  100% {
+    filter: none;
+  }
+}
+
 .enemy-name {
   font-weight: 600;
+}
+
+/* -- floating feedback --------------------------------------------------- */
+
+.effects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.stage {
+  position: relative;
+}
+
+.float {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  translate: -50% 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 4px #000;
+  white-space: nowrap;
+  animation: rise 900ms ease-out forwards;
+}
+
+.float.damage {
+  color: #ffd8d8;
+}
+
+.float.crit {
+  color: #ff9f6b;
+  font-size: 18px;
+}
+
+.float.gold {
+  color: var(--gold);
+}
+
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.85);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(calc(var(--drift, 0px) * 0.2), -6px) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 0px), -56px) scale(1);
+  }
+}
+
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  translate: -50% 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(14 13 19 / 85%);
+  border: 1px solid var(--relic);
+  color: var(--relic);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.banner.showing {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float,
+  .stage.struck {
+    animation: none;
+  }
+
+  .banner {
+    transition: none;
+  }
 }
 
 .healthbar,

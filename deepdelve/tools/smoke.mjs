@@ -70,6 +70,16 @@ const maxLabel = await page.textContent(
 );
 console.log('MAX button label:', maxLabel.trim());
 
+// Combat feedback: floating labels are pooled and only shown while alive, so
+// catching one means the loop is producing them, not merely that they exist.
+let sawFloat = false;
+for (let i = 0; i < 30 && !sawFloat; i += 1) {
+  sawFloat = await page.$$eval('.float', (n) => n.some((x) => !x.hidden));
+  if (!sawFloat) await page.waitForTimeout(200);
+}
+console.log('floating labels seen:', sawFloat);
+console.log('label pool size:', await page.$$eval('.float', (n) => n.length));
+
 console.log('boosts visible:', await page.isVisible('.boosts'));
 await page.click('.boosts .ad:first-child');
 await page.waitForTimeout(400);
@@ -100,6 +110,7 @@ for (const tab of ['동료', '심연', '강화']) {
 
 await page.click('nav.tabs button:text-is("심연")');
 await page.waitForTimeout(300);
+console.log('sound button:', await page.textContent('.settings button:nth-child(3)'));
 console.log('descend hint:', (await page.textContent('.panel:not([hidden]) .lock')).trim());
 console.log(
   'stat values:',

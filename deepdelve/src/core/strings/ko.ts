@@ -24,6 +24,8 @@ export const ko: Record<StringKey, string> = {
   'combat.perSecond': '/초',
   'combat.blessed': '축복 {time}',
   'combat.killProgress': '{done} / {total}',
+  'effect.floorCleared': '{n}층 돌파',
+  'effect.descended': '하강 완료 · 유물 +{relics}',
 
   'boost.blessing': '▶ 축복 · {minutes}분간 2배',
   'boost.chest': '▶ 상자 · {amount}',
@@ -55,6 +57,8 @@ export const ko: Record<StringKey, string> = {
 
   'settings.notation': '숫자 표기: {mode}',
   'settings.language': '언어: 한국어',
+  'settings.soundOn': '소리: 켬',
+  'settings.soundOff': '소리: 끔',
   'settings.wipe': '세이브 삭제',
   'settings.wipeConfirm': '이 세이브를 완전히 삭제할까요?',
 

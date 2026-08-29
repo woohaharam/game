@@ -20,6 +20,8 @@ export const en = {
   'combat.perSecond': ' / sec',
   'combat.blessed': 'blessed {time}',
   'combat.killProgress': '{done} / {total}',
+  'effect.floorCleared': 'Floor {n} cleared',
+  'effect.descended': 'Descended · +{relics} relics',
 
   // Minutes rather than a formatted duration: the reward is always a round
   // number of them, and `formatDuration` keeps both units for the sake of a
@@ -54,6 +56,8 @@ export const en = {
 
   'settings.notation': 'Numbers: {mode}',
   'settings.language': 'Language: English',
+  'settings.soundOn': 'Sound: on',
+  'settings.soundOff': 'Sound: off',
   'settings.wipe': 'Erase save',
   'settings.wipeConfirm': 'Erase this save permanently?',
 

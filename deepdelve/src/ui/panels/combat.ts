@@ -19,17 +19,46 @@ import {
 import { BLESSING_DURATION_SECONDS, chestValue } from '@game/rewards';
 import { computeStats } from '@game/stats';
 import { maxHealthOfCurrentEnemy, type GameState } from '@game/state';
+import type { SoundName } from '@platform/audio';
 import { el, setHidden, setText, setToggle, setVariable } from '../dom';
+import { EffectsLayer, prefersReducedMotion } from '../effects';
 
 export interface CombatPanelDeps {
   readonly state: GameState;
   readonly num: (value: Decimal | number) => string;
+  readonly sound: (name: SoundName) => void;
   readonly onWatchForBlessing: () => void;
   readonly onWatchForChest: () => void;
 }
 
+/** What the simulation did since the last rendered frame. */
+export interface FrameFeedback {
+  readonly damage: Decimal;
+  readonly gold: Decimal;
+  readonly kills: number;
+  readonly guardiansFelled: number;
+  readonly floorsCleared: number;
+  readonly floor: number;
+}
+
+/**
+ * Minimum gap between two damage labels during a long fight.
+ *
+ * A guardian can take thirty seconds, over which nothing dies and nothing would
+ * otherwise be shown. The label reports damage actually accumulated across the
+ * interval, so it stays true whatever the frame rate.
+ */
+const DAMAGE_LABEL_INTERVAL_MS = 380;
+
+/** How long the enemy flashes after a kill. Must match the CSS. */
+const STRIKE_FLASH_MS = 140;
+
 export class CombatPanel {
   private adsAvailable = false;
+  private readonly effects = new EffectsLayer(prefersReducedMotion());
+  private pendingDamage: Decimal | null = null;
+  private lastDamageLabelAt = 0;
+  private strikeUntil = 0;
 
   private zone!: HTMLElement;
   private depth!: HTMLElement;
@@ -69,6 +98,7 @@ export class CombatPanel {
     this.blessing = el('span', { class: 'blessing' }, ['']);
 
     this.stage = el('div', { class: 'stage' }, [
+      this.effects.mount(),
       this.sprite,
       this.enemyName,
       el('div', { class: 'healthbar' }, [this.healthFill, this.healthText]),
@@ -103,7 +133,55 @@ export class CombatPanel {
     return this.boosts;
   }
 
-  update(): void {
+  /**
+   * Turns one frame of simulation into something visible.
+   *
+   * Driven by what `advance` reported rather than re-derived from DPS and
+   * elapsed time: those two disagree once the kill-rate cap binds, and a
+   * floating number that disagrees with the health bar is worse than no number.
+   */
+  feedback(input: FrameFeedback, now = performance.now()): void {
+    if (input.guardiansFelled > 0) {
+      this.deps.sound('guardian');
+      this.deps.sound('floor');
+      this.effects.announce(t('effect.floorCleared', { n: input.floor - 1 }), now);
+      this.strikeUntil = now + STRIKE_FLASH_MS;
+    } else if (input.kills > 0) {
+      this.deps.sound('kill');
+      this.strikeUntil = now + STRIKE_FLASH_MS;
+    } else if (!input.damage.isZero) {
+      this.deps.sound('hit');
+    }
+
+    if (input.kills > 0 && !input.gold.isZero) {
+      this.effects.spawn(`+${this.deps.num(input.gold)}`, 'gold', now);
+    }
+
+    // Damage accumulates between labels instead of being dropped, so a long
+    // guardian fight shows the true running total rather than one frame's worth.
+    this.pendingDamage =
+      this.pendingDamage === null ? input.damage : this.pendingDamage.add(input.damage);
+
+    if (
+      !this.pendingDamage.isZero &&
+      now - this.lastDamageLabelAt >= DAMAGE_LABEL_INTERVAL_MS
+    ) {
+      this.lastDamageLabelAt = now;
+      this.effects.spawn(
+        this.deps.num(this.pendingDamage),
+        this.deps.state.fightingGuardian ? 'crit' : 'damage',
+        now,
+      );
+      this.pendingDamage = null;
+    }
+  }
+
+  /** Shows a centred message over the stage. */
+  announce(text: string, now = performance.now()): void {
+    this.effects.announce(text, now);
+  }
+
+  update(now = performance.now()): void {
     const state = this.deps.state;
     const stats = computeStats(state);
     const num = this.deps.num;
@@ -148,6 +226,9 @@ export class CombatPanel {
         ? ` · ${t('combat.blessed', { time: duration(state.blessingRemaining) })}`
         : '',
     );
+
+    setToggle(this.stage, 'struck', now < this.strikeUntil);
+    this.effects.update(now);
 
     setHidden(this.boosts, !this.adsAvailable);
     if (this.adsAvailable) {
