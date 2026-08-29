@@ -9,7 +9,7 @@
  * phonetic renderings of the English, which read as noise. And numbers are
  * grouped in fours (만, 억, 조) rather than threes; see `formatKorean`.
  */
-import type { en, StringKey } from './en';
+import type { StringKey } from './en';
 
 export const ko: Record<StringKey, string> = {
   'game.title': '딥델브 — 방치형 던전 RPG',
@@ -139,6 +139,3 @@ export const ko: Record<StringKey, string> = {
   'duration.minute': '분',
   'duration.second': '초',
 };
-
-/** Present only so the English table is referenced and cannot silently drift. */
-export type KoreanCoverage = typeof en;

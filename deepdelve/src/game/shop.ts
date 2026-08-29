@@ -1,27 +1,30 @@
 /**
  * Spending gold.
  *
- * Purchases are the only thing in the game the player actually does, so this
- * module is deliberately the strictest one: every function validates the
- * purchase against the live state before mutating anything, and returns what
- * happened rather than throwing. A UI that offers a button it should not have
- * offered is a bug, but it must never be a crash.
+ * Purchases are the only thing in the game the player actually does, which
+ * makes this the strictest module: every function validates against the live
+ * state before mutating anything, and reports what happened rather than
+ * throwing. A UI that offers a button it should not have offered is a bug, but
+ * it must never be a crash, and it must never charge for what it did not give.
  */
 
 import { Decimal } from '@core/decimal';
 import {
-  UPGRADES,
   affordableLevels,
-  upgradeBulkCost,
+  bulkCost,
+  costAt,
+  headroom,
+  type CostCurve,
+} from './content/cost-curve';
+import {
+  UPGRADES,
   upgradeById,
-  upgradeCost,
   type UpgradeDefinition,
   type UpgradeId,
 } from './content/upgrades';
 import {
   COMPANIONS,
   companionById,
-  companionCost,
   type CompanionDefinition,
   type CompanionId,
 } from './content/companions';
@@ -34,7 +37,66 @@ export interface Purchase {
 
 const NOTHING: Purchase = { bought: 0, spent: Decimal.ZERO };
 
-/** Upgrades appear only once the run has been deep enough to have met them. */
+/**
+ * How far the closed-form estimate is allowed to be corrected, in either
+ * direction.
+ *
+ * `affordableLevels` inverts a logarithm over floating-point Decimals, so it
+ * can land one level either side of the truth — and it lands there exactly
+ * where it matters, when a player presses MAX holding precisely the price of N
+ * levels. Rounding down short-changes them; rounding up would charge gold they
+ * do not have. Both were observed before this correction existed: gold equal to
+ * one level's price bought nothing, and gold equal to twenty-five levels'
+ * bought twenty-four.
+ *
+ * In practice the loops below run zero or one times. The bound exists so that a
+ * pathological curve cannot spin.
+ */
+const PRICE_CORRECTION_STEPS = 8;
+
+/** Everything a purchase needs to know, independent of what is being bought. */
+interface Purchasable {
+  readonly curve: CostCurve;
+  readonly level: number;
+}
+
+/**
+ * Resolves how many levels can actually be bought and what they cost.
+ *
+ * Returns the largest count whose true series cost the bank covers, which is
+ * not always what the inverted logarithm suggests — hence the correction. The
+ * alternative, trusting the estimate, charges players gold they do not have.
+ */
+function priceFor(state: GameState, target: Purchasable, wanted: number): Purchase {
+  const room = Math.min(wanted, headroom(target.curve, target.level));
+  if (room <= 0) return NOTHING;
+
+  const affordable = (count: number): boolean =>
+    !bulkCost(target.curve, target.level, count).greaterThan(state.gold);
+
+  let count = Math.max(
+    0,
+    Math.min(room, affordableLevels(target.curve, target.level, state.gold)),
+  );
+
+  // Correct in whichever direction the estimate is wrong. Only one of these
+  // loops can make progress, so they cannot fight each other.
+  for (let step = 0; step < PRICE_CORRECTION_STEPS; step += 1) {
+    if (count >= room || !affordable(count + 1)) break;
+    count += 1;
+  }
+  for (let step = 0; step < PRICE_CORRECTION_STEPS; step += 1) {
+    if (count <= 0 || affordable(count)) break;
+    count -= 1;
+  }
+
+  if (count <= 0) return NOTHING;
+  return { bought: count, spent: bulkCost(target.curve, target.level, count) };
+}
+
+// -- availability ----------------------------------------------------------
+
+/** Things appear in the shop only once the run has been deep enough to meet them. */
 export function isUpgradeUnlocked(state: GameState, definition: UpgradeDefinition): boolean {
   return Math.max(state.floor, state.highestFloor) >= definition.unlockFloor;
 }
@@ -46,86 +108,58 @@ export function isCompanionUnlocked(
   return Math.max(state.floor, state.highestFloor) >= definition.unlockFloor;
 }
 
-export function visibleUpgrades(state: GameState): readonly UpgradeDefinition[] {
-  return UPGRADES.filter((upgrade) => isUpgradeUnlocked(state, upgrade));
-}
-
-export function visibleCompanions(state: GameState): readonly CompanionDefinition[] {
-  return COMPANIONS.filter((companion) => isCompanionUnlocked(state, companion));
+export function isUpgradeMaxed(state: GameState, definition: UpgradeDefinition): boolean {
+  return headroom(definition, state.upgrades[definition.id]) === 0;
 }
 
 export function nextUpgradeCost(state: GameState, id: UpgradeId): Decimal {
-  return upgradeCost(upgradeById(id), state.upgrades[id]);
+  return costAt(upgradeById(id), state.upgrades[id]);
 }
 
 export function nextCompanionCost(state: GameState, id: CompanionId): Decimal {
-  return companionCost(companionById(id), state.companions[id]);
+  return costAt(companionById(id), state.companions[id]);
 }
+
+/** What a purchase of `wanted` levels would cost and buy, without buying it. */
+export function quoteUpgrade(state: GameState, id: UpgradeId, wanted: number): Purchase {
+  const definition = upgradeById(id);
+  if (!isUpgradeUnlocked(state, definition)) return NOTHING;
+  return priceFor(state, { curve: definition, level: state.upgrades[id] }, wanted);
+}
+
+export function quoteCompanion(state: GameState, id: CompanionId, wanted: number): Purchase {
+  const definition = companionById(id);
+  if (!isCompanionUnlocked(state, definition)) return NOTHING;
+  return priceFor(state, { curve: definition, level: state.companions[id] }, wanted);
+}
+
+// -- purchasing ------------------------------------------------------------
 
 /** Buys up to `count` levels, or as many as the bank allows. */
 export function buyUpgrade(state: GameState, id: UpgradeId, count = 1): Purchase {
-  const definition = upgradeById(id);
-  if (!isUpgradeUnlocked(state, definition) || count <= 0) return NOTHING;
+  if (count <= 0) return NOTHING;
 
-  const level = state.upgrades[id];
-  const possible = Math.min(count, affordableLevels(definition, level, state.gold));
-  if (possible <= 0) return NOTHING;
+  const purchase = quoteUpgrade(state, id, count);
+  if (purchase.bought === 0) return NOTHING;
 
-  const spent = upgradeBulkCost(definition, level, possible);
-  // The closed-form series can land a hair above the bank at the boundary;
-  // taking one fewer level is the honest correction, since the alternative is
-  // charging a player gold they do not have.
-  if (spent.greaterThan(state.gold)) {
-    if (possible === 1) return NOTHING;
-    return buyUpgrade(state, id, possible - 1);
-  }
-
-  state.gold = state.gold.subtract(spent);
-  state.upgrades[id] = level + possible;
-  return { bought: possible, spent };
-}
-
-/** Buys every level the bank can currently afford. */
-export function buyMaxUpgrade(state: GameState, id: UpgradeId): Purchase {
-  const definition = upgradeById(id);
-  if (!isUpgradeUnlocked(state, definition)) return NOTHING;
-  return buyUpgrade(state, id, affordableLevels(definition, state.upgrades[id], state.gold));
+  state.gold = state.gold.subtract(purchase.spent);
+  state.upgrades[id] += purchase.bought;
+  return purchase;
 }
 
 export function buyCompanion(state: GameState, id: CompanionId, count = 1): Purchase {
-  const definition = companionById(id);
-  if (!isCompanionUnlocked(state, definition) || count <= 0) return NOTHING;
+  if (count <= 0) return NOTHING;
 
-  let bought = 0;
-  let spent = Decimal.ZERO;
-  // Companion levels are bought a handful at a time rather than in thousands,
-  // so a loop is clearer here than inverting the series and cheap enough.
-  for (let i = 0; i < count; i += 1) {
-    const price = companionCost(definition, state.companions[id] + bought);
-    const remaining = state.gold.subtract(spent);
-    if (price.greaterThan(remaining)) break;
-    spent = spent.add(price);
-    bought += 1;
-  }
+  const purchase = quoteCompanion(state, id, count);
+  if (purchase.bought === 0) return NOTHING;
 
-  if (bought === 0) return NOTHING;
-  state.gold = state.gold.subtract(spent);
-  state.companions[id] += bought;
-  return { bought, spent };
+  state.gold = state.gold.subtract(purchase.spent);
+  state.companions[id] += purchase.bought;
+  return purchase;
 }
 
-/**
- * A stand-in for a player at the shop: buy the cheapest thing available, repeat.
- *
- * This exists for two reasons. It is what an unlocked auto-spend convenience
- * would do, and — more importantly — it is what lets a test or a balance run
- * measure progression, because a hero who never spends gold never gets past the
- * first guardian and tells you nothing about the curves.
- *
- * Cheapest-first is not optimal play, and that is the point: it is a *floor* on
- * how well the curves perform. If the game is satisfying under a shopper this
- * naive, a thoughtful player will do better.
- */
+// -- a stand-in for a player -----------------------------------------------
+
 type PurchaseChoice =
   | { readonly kind: 'upgrade'; readonly id: UpgradeId }
   | { readonly kind: 'companion'; readonly id: CompanionId };
@@ -136,11 +170,9 @@ function cheapestAffordable(state: GameState): PurchaseChoice | null {
   let bestCost = Decimal.ZERO;
 
   for (const definition of UPGRADES) {
-    if (!isUpgradeUnlocked(state, definition)) continue;
-    const level = state.upgrades[definition.id];
-    if (definition.maxLevel !== undefined && level >= definition.maxLevel) continue;
+    if (!isUpgradeUnlocked(state, definition) || isUpgradeMaxed(state, definition)) continue;
 
-    const cost = upgradeCost(definition, level);
+    const cost = costAt(definition, state.upgrades[definition.id]);
     if (cost.greaterThan(state.gold)) continue;
     if (best === null || cost.lessThan(bestCost)) {
       best = { kind: 'upgrade', id: definition.id };
@@ -153,7 +185,7 @@ function cheapestAffordable(state: GameState): PurchaseChoice | null {
   for (const definition of COMPANIONS) {
     if (!isCompanionUnlocked(state, definition)) continue;
 
-    const cost = companionCost(definition, state.companions[definition.id]);
+    const cost = costAt(definition, state.companions[definition.id]);
     if (cost.greaterThan(state.gold)) continue;
     if (best === null || cost.lessThan(bestCost)) {
       best = { kind: 'companion', id: definition.id };
@@ -164,6 +196,18 @@ function cheapestAffordable(state: GameState): PurchaseChoice | null {
   return best;
 }
 
+/**
+ * Buy the cheapest thing available, repeat.
+ *
+ * This exists for two reasons. It is what an unlocked auto-spend convenience
+ * would do, and — more importantly — it is what lets a test or a balance run
+ * measure progression, because a hero who never spends gold never passes the
+ * first guardian and tells you nothing about the curves.
+ *
+ * Cheapest-first is not optimal play, and that is the point: every number it
+ * produces is a lower bound. A curve that is satisfying under a shopper this
+ * naive is satisfying; one that stalls here needs looking at.
+ */
 export function spendGreedily(state: GameState, maxPurchases = 20_000): number {
   let purchases = 0;
 

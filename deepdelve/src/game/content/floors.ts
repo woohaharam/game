@@ -48,10 +48,6 @@ const GOLD_GROWTH = 1.47;
  */
 export const MIN_KILL_TIME = 0.05;
 
-export function isBossFloor(floor: number): boolean {
-  return floor % 5 === 0;
-}
-
 export function monsterHealth(floor: number): Decimal {
   return Decimal.of(BASE_HEALTH, 0).multiply(Decimal.of(HEALTH_GROWTH, 0).pow(floor - 1));
 }

@@ -7,6 +7,10 @@ import { advance } from '../src/game/simulation';
 import { applyOfflineProgress, OFFLINE_CAP_SECONDS } from '../src/game/offline';
 import { canDescend, descend, pendingRelics, DESCENT_UNLOCK_FLOOR } from '../src/game/prestige';
 import { autoplay } from '../src/game/autoplay';
+import { bulkCost } from '../src/game/content/cost-curve';
+import { UPGRADES } from '../src/game/content/upgrades';
+import { COMPANIONS } from '../src/game/content/companions';
+import { buyCompanion, buyUpgrade, quoteUpgrade } from '../src/game/shop';
 
 describe('save round-trip', () => {
   it('restores a played run exactly', () => {
@@ -246,5 +250,90 @@ describe('descending', () => {
     // the rest of the game is built around; a player who never meets it never
     // learns there is a reason to come back.
     expect(result.highestFloor).toBeGreaterThanOrEqual(DESCENT_UNLOCK_FLOOR);
+  });
+});
+
+describe('purchasing', () => {
+  it('never charges more gold than the player has', () => {
+    // The affordable-levels estimate inverts a logarithm and can land a level
+    // above the truth at the boundary. Buying at exactly the price of N levels,
+    // across every curve in the game, is where that shows up.
+    for (const definition of UPGRADES) {
+      for (const levels of [1, 2, 7, 40, 300]) {
+        const state = createInitialState(0);
+        // Deep enough that every upgrade is on sale; the unlock rule is tested
+        // separately and would otherwise mask the boundary this is about.
+        state.highestFloor = 200;
+        state.gold = bulkCost(definition, 0, levels);
+
+        const purchase = buyUpgrade(state, definition.id, Number.MAX_SAFE_INTEGER);
+
+        expect(state.gold.isNegative, `${definition.id} ×${levels}`).toBe(false);
+        expect(purchase.bought, `${definition.id} ×${levels}`).toBeGreaterThan(0);
+        expect(purchase.spent.greaterThan(bulkCost(definition, 0, levels))).toBe(false);
+      }
+    }
+  });
+
+  it('buys as many levels as the bank truly covers, not one fewer', () => {
+    const definition = UPGRADES[0];
+    if (definition === undefined) throw new Error('no upgrades');
+
+    const state = createInitialState(0);
+    state.highestFloor = 200;
+    state.gold = bulkCost(definition, 0, 25);
+    expect(buyUpgrade(state, definition.id, Number.MAX_SAFE_INTEGER).bought).toBe(25);
+  });
+
+  it('quotes exactly what the purchase will do', () => {
+    const state = createInitialState(0);
+    state.highestFloor = 200;
+    state.gold = Decimal.of(5, 6);
+
+    for (const definition of UPGRADES) {
+      const quote = quoteUpgrade(state, definition.id, 10);
+      const purchase = buyUpgrade(state, definition.id, 10);
+      expect(purchase.bought).toBe(quote.bought);
+      expect(purchase.spent.serialise()).toBe(quote.spent.serialise());
+    }
+  });
+
+  it('respects a level cap without spending anything at it', () => {
+    const definition = UPGRADES.find((u) => u.maxLevel !== undefined);
+    if (definition === undefined) throw new Error('expected a capped upgrade');
+
+    const state = createInitialState(0);
+    state.highestFloor = 100;
+    state.gold = Decimal.of(1, 200);
+
+    buyUpgrade(state, definition.id, Number.MAX_SAFE_INTEGER);
+    expect(state.upgrades[definition.id]).toBe(definition.maxLevel);
+
+    const goldBefore = state.gold.serialise();
+    expect(buyUpgrade(state, definition.id, 5).bought).toBe(0);
+    expect(state.gold.serialise()).toBe(goldBefore);
+  });
+
+  it('will not sell anything the run has not unlocked yet', () => {
+    const state = createInitialState(0);
+    state.gold = Decimal.of(1, 100);
+
+    // The last companion unlocks at floor 110; a floor-1 hero cannot recruit it.
+    const locked = COMPANIONS[COMPANIONS.length - 1];
+    if (locked === undefined) throw new Error('no companions');
+    expect(buyCompanion(state, locked.id, 1).bought).toBe(0);
+    expect(state.companions[locked.id]).toBe(0);
+  });
+
+  it('buys companions in bulk through the same closed form as upgrades', () => {
+    const definition = COMPANIONS[0];
+    if (definition === undefined) throw new Error('no companions');
+
+    const state = createInitialState(0);
+    state.highestFloor = 50;
+    state.gold = bulkCost(definition, 0, 12);
+
+    expect(buyCompanion(state, definition.id, Number.MAX_SAFE_INTEGER).bought).toBe(12);
+    expect(state.gold.isNegative).toBe(false);
   });
 });

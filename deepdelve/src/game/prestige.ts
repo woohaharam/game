@@ -65,11 +65,6 @@ export function canDescend(state: GameState): boolean {
   return state.highestFloor >= DESCENT_UNLOCK_FLOOR;
 }
 
-/** How many more floors before the descent payout goes up by a whole relic. */
-export function relicsAtFloor(floor: number): Decimal {
-  return pendingRelics(floor);
-}
-
 export interface DescentResult {
   readonly relicsGained: Decimal;
   readonly floorReached: number;

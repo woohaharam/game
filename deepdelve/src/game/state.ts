@@ -11,12 +11,7 @@
 import { Decimal } from '@core/decimal';
 import { COMPANIONS, type CompanionId } from './content/companions';
 import { UPGRADES, type UpgradeId } from './content/upgrades';
-import {
-  BOSS_TIME_LIMIT,
-  KILLS_PER_FLOOR,
-  guardianHealth,
-  monsterHealth,
-} from './content/floors';
+import { BOSS_TIME_LIMIT, guardianHealth, monsterHealth } from './content/floors';
 
 export interface RunStatistics {
   totalKills: number;
@@ -129,11 +124,6 @@ export function descendOneFloor(state: GameState): void {
 
 export function maxHealthOfCurrentEnemy(state: GameState): Decimal {
   return state.fightingGuardian ? guardianHealth(state.floor) : monsterHealth(state.floor);
-}
-
-export function floorProgress(state: GameState): number {
-  if (state.fightingGuardian) return 1;
-  return Math.min(1, state.killsOnFloor / KILLS_PER_FLOOR);
 }
 
 /**

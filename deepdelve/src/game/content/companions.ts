@@ -12,17 +12,16 @@
 
 import { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
+import type { CostCurve } from './cost-curve';
 
 export type CompanionId =
   'torchbearer' | 'houndmaster' | 'runesmith' | 'revenant' | 'archivist';
 
-export interface CompanionDefinition {
+export interface CompanionDefinition extends CostCurve {
   readonly id: CompanionId;
   readonly icon: string;
   /** Damage per second contributed by each level, before global multipliers. */
   readonly damagePerLevel: Decimal;
-  readonly baseCost: Decimal;
-  readonly costGrowth: number;
   /** Highest floor the player must have reached before recruitment. */
   readonly unlockFloor: number;
 }
@@ -81,8 +80,4 @@ export function companionById(id: CompanionId): CompanionDefinition {
   const definition = BY_ID.get(id);
   if (definition === undefined) throw new Error(`unknown companion: ${id}`);
   return definition;
-}
-
-export function companionCost(definition: CompanionDefinition, level: number): Decimal {
-  return definition.baseCost.multiply(Decimal.of(definition.costGrowth, 0).pow(level));
 }

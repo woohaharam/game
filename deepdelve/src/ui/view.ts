@@ -34,14 +34,16 @@ import {
   buyCompanion,
   buyUpgrade,
   isCompanionUnlocked,
+  isUpgradeMaxed,
   isUpgradeUnlocked,
   nextCompanionCost,
   nextUpgradeCost,
+  quoteCompanion,
+  quoteUpgrade,
+  type Purchase,
 } from '@game/shop';
-import { affordableLevels, upgradeBulkCost } from '@game/content/upgrades';
 import { computeStats } from '@game/stats';
 import { maxHealthOfCurrentEnemy, type GameState } from '@game/state';
-import { upgradeById } from '@game/content/upgrades';
 import { el, setDisabled, setHidden, setText, setToggle, setVariable } from './dom';
 
 /** How many levels a purchase button buys. `max` spends whatever is banked. */
@@ -536,38 +538,26 @@ export class GameView {
       setHidden(row.root, !unlocked);
       if (!unlocked) continue;
 
-      const level = this.state.upgrades[definition.id];
       setText(row.name, upgradeName(definition.id));
       setText(row.description, upgradeDescription(definition.id));
 
-      const capped = definition.maxLevel !== undefined && level >= definition.maxLevel;
-      setText(row.level, capped ? t('shop.maxed') : t('shop.level', { n: level }));
+      const capped = isUpgradeMaxed(this.state, definition);
+      setText(
+        row.level,
+        capped ? t('shop.maxed') : t('shop.level', { n: this.state.upgrades[definition.id] }),
+      );
 
       if (capped) {
-        setText(row.cost, '—');
+        setText(row.cost, '\u2014');
         setText(row.quantity, '');
         setDisabled(row.button, true);
+        setToggle(row.root, 'affordable', false);
         continue;
       }
 
-      // The button shows what pressing it right now would actually cost and
-      // buy, rather than a sticker price for one level the player is not
-      // buying. On MAX that means recomputing the affordable count each frame,
-      // which is a logarithm, not a loop.
-      const wanted =
-        this.quantity === 'max'
-          ? Math.max(1, affordableLevels(definition, level, this.state.gold))
-          : this.quantity;
-      const capacity =
-        definition.maxLevel === undefined
-          ? wanted
-          : Math.min(wanted, definition.maxLevel - level);
-      const price = upgradeBulkCost(definition, level, Math.max(1, capacity));
-
-      setText(row.cost, this.num(price));
-      setText(row.quantity, capacity > 1 ? ` ×${capacity}` : '');
-      setDisabled(row.button, price.greaterThan(this.state.gold));
-      setToggle(row.root, 'affordable', !price.greaterThan(this.state.gold));
+      this.paintPrice(row, quoteUpgrade(this.state, definition.id, this.wantedLevels()), () =>
+        nextUpgradeCost(this.state, definition.id),
+      );
     }
   }
 
@@ -580,19 +570,38 @@ export class GameView {
       setHidden(row.root, !unlocked);
       if (!unlocked) continue;
 
-      const level = this.state.companions[definition.id];
       setText(row.name, companionName(definition.id));
       setText(
         row.description,
         t('party.damage', { amount: formatNumber(definition.damagePerLevel) }),
       );
-      setText(row.level, t('shop.level', { n: level }));
-      const price = nextCompanionCost(this.state, definition.id);
-      setText(row.cost, this.num(price));
-      setText(row.quantity, '');
-      setDisabled(row.button, price.greaterThan(this.state.gold));
-      setToggle(row.root, 'affordable', !price.greaterThan(this.state.gold));
+      setText(row.level, t('shop.level', { n: this.state.companions[definition.id] }));
+
+      this.paintPrice(row, quoteCompanion(this.state, definition.id, this.wantedLevels()), () =>
+        nextCompanionCost(this.state, definition.id),
+      );
     }
+  }
+
+  /** How many levels the current quantity setting asks for. */
+  private wantedLevels(): number {
+    return this.quantity === 'max' ? Number.MAX_SAFE_INTEGER : this.quantity;
+  }
+
+  /**
+   * Labels a buy button from the same function the click calls.
+   *
+   * That is the whole point of routing both through `quote*`: the button can
+   * never promise a count or a price the purchase would not honour. When
+   * nothing is affordable it falls back to one level's price, which is the
+   * number the player is saving towards.
+   */
+  private paintPrice(row: UpgradeRow, quote: Purchase, fallbackPrice: () => Decimal): void {
+    const affordable = quote.bought > 0;
+    setText(row.cost, this.num(affordable ? quote.spent : fallbackPrice()));
+    setText(row.quantity, quote.bought > 1 ? ` \u00d7${quote.bought}` : '');
+    setDisabled(row.button, !affordable);
+    setToggle(row.root, 'affordable', affordable);
   }
 
   private updateDescend(): void {
@@ -632,6 +641,3 @@ export class GameView {
     });
   }
 }
-
-/** Re-exported so the boot code does not need a second import for this. */
-export { upgradeById, nextUpgradeCost };
