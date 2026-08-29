@@ -29,7 +29,7 @@ exploit: players work out whether it pays to close the tab, and the honest way
 to play stops being the best way to play.
 
 Serving both from one function means it has to be O(events), not O(ticks). Eight
-hours at sixty ticks a second is 1.7 million iterations; eight hours of *events*
+hours at sixty ticks a second is 1.7 million iterations; eight hours of _events_
 is a few thousand, because kills at a constant rate can be counted with a
 division. Criticals are folded into DPS as an expectation rather than rolled,
 since a dice roll would make eight hours away disagree with eight hours watched
@@ -50,7 +50,7 @@ the game ends without saying so — at 1.36 a simulated player crawls from floor
 213 to floor 228 across twenty descents and stops. At 1.75 the gains multiply
 and floor 4,000 arrives inside two days. At 1.58 the gain climbs steadily from
 +19 floors to +170 across 24 descents and never plateaus. `tests/save.test.ts`
-asserts the *ratio* rather than the payout, because the payout can be retuned
+asserts the _ratio_ rather than the payout, because the payout can be retuned
 freely and the ratio cannot.
 
 **Advertising rules live in one place.** Portals largely agree: rewarded ads
@@ -86,7 +86,7 @@ The interesting part is not the string table. It is that **Korean groups large
 numbers in fours, not threes**: 만 is 10^4, 억 is 10^8, 조 is 10^12. Rendering
 12,345 as `12.34K` asks a Korean reader to stop and convert; `1.234만` is simply
 read. Within a Korean unit the magnitude spans three orders rather than two, so
-the formatter holds four *significant digits* instead of a fixed decimal count —
+the formatter holds four _significant digits_ instead of a fixed decimal count —
 1.234만, 12.34만, 123.4만, 1234만 — and names units as deep as Korean actually
 names them, through 극 (10^48) and the Buddhist series to 무량대수 (10^68),
 before falling back to an exponent.

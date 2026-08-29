@@ -73,11 +73,15 @@ export function detectLocale(options: {
 }
 
 /** Looks up a string and substitutes `{name}` placeholders. */
-export function t(key: StringKey, params: Readonly<Record<string, string | number>> = {}): string {
-  const table = TABLES[current];
-  // Falling back to English rather than to the key itself: an untranslated
-  // string is a small blemish, a raw `descend.locked` in the UI is a bug report.
-  const template = table[key] ?? en[key];
+export function t(
+  key: StringKey,
+  params: Readonly<Record<string, string | number>> = {},
+): string {
+  // No runtime fallback to English, because there cannot be a gap: each table is
+  // typed `Record<StringKey, string>` over a finite key union, so a missing
+  // translation fails the build. That is strictly better than shipping a
+  // fallback that quietly hides an untranslated string forever.
+  const template = TABLES[current][key];
 
   return template.replace(/\{(\w+)\}/g, (whole, name: string) => {
     const value = params[name];

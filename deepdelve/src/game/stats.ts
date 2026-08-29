@@ -77,9 +77,7 @@ export function computeStats(source: PowerSource): HeroStats {
   const blessing = Decimal.of(blessed ? BLESSING_MULTIPLIER : 1, 0);
   const relicMult = relicMultiplier(source.relics);
 
-  const globalDamage = Decimal.ONE.add(
-    Decimal.of(DAMAGE_PER_TOME * source.upgrades.tome, 0),
-  )
+  const globalDamage = Decimal.ONE.add(Decimal.of(DAMAGE_PER_TOME * source.upgrades.tome, 0))
     .multiply(relicMult)
     .multiply(blessing);
 
@@ -88,11 +86,15 @@ export function computeStats(source: PowerSource): HeroStats {
     0,
   ).multiply(globalDamage);
 
-  const strikesPerSecond = BASE_STRIKES_PER_SECOND + STRIKES_PER_SWIFTNESS * source.upgrades.swiftness;
+  const strikesPerSecond =
+    BASE_STRIKES_PER_SECOND + STRIKES_PER_SWIFTNESS * source.upgrades.swiftness;
 
   // Crit chance is a probability and has to be clamped; a save reporting 140%
   // should be treated as certainty, not as a 1.4× on the expectation.
-  const critChance = Math.min(1, BASE_CRIT_CHANCE + CRIT_PER_PRECISION * source.upgrades.precision);
+  const critChance = Math.min(
+    1,
+    BASE_CRIT_CHANCE + CRIT_PER_PRECISION * source.upgrades.precision,
+  );
   const critMultiplier =
     BASE_CRIT_MULTIPLIER + CRIT_MULTIPLIER_PER_FEROCITY * source.upgrades.ferocity;
 
@@ -109,7 +111,9 @@ export function computeStats(source: PowerSource): HeroStats {
   for (const companion of COMPANIONS) {
     const level = source.companions[companion.id];
     if (level > 0) {
-      companionBase = companionBase.add(companion.damagePerLevel.multiply(Decimal.of(level, 0)));
+      companionBase = companionBase.add(
+        companion.damagePerLevel.multiply(Decimal.of(level, 0)),
+      );
     }
   }
   const companionDamagePerSecond = companionBase.multiply(globalDamage);

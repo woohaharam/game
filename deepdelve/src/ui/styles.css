@@ -52,8 +52,14 @@ body {
    * families behind it are the fallbacks for browsers where system-ui resolves
    * to a Latin-only face.
    */
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic',
-    'Noto Sans KR', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Apple SD Gothic Neo',
+    'Malgun Gothic',
+    'Noto Sans KR',
+    sans-serif;
   /* Korean sits taller in the line box than Latin and needs the extra leading. */
   font-size: 15px;
   line-height: 1.55;
@@ -93,7 +99,9 @@ button {
   min-height: 44px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 120ms ease, transform 60ms ease;
+  transition:
+    background 120ms ease,
+    transform 60ms ease;
 }
 
 button:active:not(:disabled) {

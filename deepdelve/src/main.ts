@@ -12,7 +12,14 @@
 
 import './ui/styles.css';
 
-import { defaultNotation, detectLocale, setLocale, t, LOCALE_STORAGE_KEY, type Locale } from '@core/i18n';
+import {
+  defaultNotation,
+  detectLocale,
+  setLocale,
+  t,
+  LOCALE_STORAGE_KEY,
+  type Locale,
+} from '@core/i18n';
 import type { Notation } from '@core/format';
 import { createStore } from '@core/storage';
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
@@ -72,14 +79,16 @@ function boot(): void {
   const NOTATION_KEY = 'deepdelve.notation';
   const locale = detectLocale({
     stored: store.read(LOCALE_STORAGE_KEY),
-    search: globalThis.location?.search,
+    search: globalThis.location.search,
     languages: navigator.languages,
   });
   setLocale(locale);
 
   const storedNotation = store.read(NOTATION_KEY);
   const notation: Notation =
-    storedNotation === 'suffix' || storedNotation === 'scientific' || storedNotation === 'korean'
+    storedNotation === 'suffix' ||
+    storedNotation === 'scientific' ||
+    storedNotation === 'korean'
       ? storedNotation
       : defaultNotation(locale);
 

@@ -152,18 +152,25 @@ describe('portal detection', () => {
       CrazyGames: {
         SDK: {
           ad: {
-            requestAd: (_t: string, cb: { adError?: (e: unknown) => void }) => cb.adError?.('no fill'),
+            requestAd: (_t: string, cb: { adError?: (e: unknown) => void }) =>
+              cb.adError?.('no fill'),
           },
         },
       },
     });
-    expect(await provider.showRewarded('chest')).toEqual({ granted: false, reason: 'dismissed' });
+    expect(await provider.showRewarded('chest')).toEqual({
+      granted: false,
+      reason: 'dismissed',
+    });
   });
 
   it('honours Poki reporting that the player skipped', async () => {
     const provider = detectAdProvider({ PokiSDK: { rewardedBreak: async () => false } });
     expect(provider.name).toBe('poki');
-    expect(await provider.showRewarded('chest')).toEqual({ granted: false, reason: 'dismissed' });
+    expect(await provider.showRewarded('chest')).toEqual({
+      granted: false,
+      reason: 'dismissed',
+    });
   });
 
   it('survives an SDK that is present but half-built', async () => {
@@ -180,10 +187,12 @@ describe('portal detection', () => {
   });
 
   it('reaches the debug provider only through an explicit opt-in', () => {
-    expect(detectAdProvider({ location: { search: '?ads=debug' } }).rewardedAvailable()).toBe(true);
-    expect(detectAdProvider({ location: { search: '?utm=whatever' } }).rewardedAvailable()).toBe(
-      false,
+    expect(detectAdProvider({ location: { search: '?ads=debug' } }).rewardedAvailable()).toBe(
+      true,
     );
+    expect(
+      detectAdProvider({ location: { search: '?utm=whatever' } }).rewardedAvailable(),
+    ).toBe(false);
   });
 
   it('grants immediately in debug, so reward flows can be exercised offline', async () => {

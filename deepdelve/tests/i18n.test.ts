@@ -96,7 +96,7 @@ describe('string tables', () => {
     const placeholders = (text: string): string[] =>
       (text.match(/\{\w+\}/g) ?? []).slice().sort();
 
-    for (const key of Object.keys(en) as Array<keyof typeof en>) {
+    for (const key of Object.keys(en) as (keyof typeof en)[]) {
       // A dropped placeholder shows the player a sentence with a hole in it.
       expect(placeholders(ko[key]), key).toEqual(placeholders(en[key]));
     }

@@ -39,7 +39,10 @@ export function isUpgradeUnlocked(state: GameState, definition: UpgradeDefinitio
   return Math.max(state.floor, state.highestFloor) >= definition.unlockFloor;
 }
 
-export function isCompanionUnlocked(state: GameState, definition: CompanionDefinition): boolean {
+export function isCompanionUnlocked(
+  state: GameState,
+  definition: CompanionDefinition,
+): boolean {
   return Math.max(state.floor, state.highestFloor) >= definition.unlockFloor;
 }
 

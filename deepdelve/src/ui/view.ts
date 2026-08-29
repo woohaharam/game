@@ -184,9 +184,7 @@ export class GameView {
           ]),
           this.track(
             'timer',
-            el('div', { class: 'timer' }, [
-              this.track('timerText', el('span', {}, ['']))
-            ]),
+            el('div', { class: 'timer' }, [this.track('timerText', el('span', {}, ['']))]),
           ),
         ]),
       ),
@@ -214,7 +212,10 @@ export class GameView {
     );
     blessing.addEventListener('click', () => this.callbacks.onWatchForBlessing());
 
-    const chest = this.track('chestButton', el('button', { class: 'ad', type: 'button' }, ['']));
+    const chest = this.track(
+      'chestButton',
+      el('button', { class: 'ad', type: 'button' }, ['']),
+    );
     chest.addEventListener('click', () => this.callbacks.onWatchForChest());
 
     return this.track('boosts', el('div', { class: 'boosts' }, [blessing, chest]));
@@ -410,7 +411,11 @@ export class GameView {
   }
 
   private purchaseUpgrade(id: UpgradeId): void {
-    buyUpgrade(this.state, id, this.quantity === 'max' ? Number.MAX_SAFE_INTEGER : this.quantity);
+    buyUpgrade(
+      this.state,
+      id,
+      this.quantity === 'max' ? Number.MAX_SAFE_INTEGER : this.quantity,
+    );
   }
 
   private purchaseCompanion(id: CompanionId): void {
@@ -425,7 +430,10 @@ export class GameView {
     readonly cappedOut: boolean;
     readonly canDouble: boolean;
   }): void {
-    setText(this.ref('offlineDuration'), t('offline.away', { duration: duration(summary.awaySeconds) }));
+    setText(
+      this.ref('offlineDuration'),
+      t('offline.away', { duration: duration(summary.awaySeconds) }),
+    );
     setText(this.ref('offlineGold'), this.num(summary.gold));
     setText(this.ref('offlineKills'), this.num(summary.kills));
     setText(this.ref('offlineFloors'), String(summary.floors));
@@ -468,7 +476,9 @@ export class GameView {
     setToggle(this.ref('stage'), 'guardian', state.fightingGuardian);
     setText(
       this.ref('enemyName'),
-      state.fightingGuardian ? guardianName(state.floor) : monsterName(state.floor, state.enemyIndex),
+      state.fightingGuardian
+        ? guardianName(state.floor)
+        : monsterName(state.floor, state.enemyIndex),
     );
     setText(this.ref('sprite'), state.fightingGuardian ? '👑' : '🐀');
 
@@ -489,12 +499,17 @@ export class GameView {
     setText(this.ref('dps'), this.num(stats.damagePerSecond));
     setText(
       this.ref('blessing'),
-      stats.blessed ? ` · ${t('combat.blessed', { time: duration(state.blessingRemaining) })}` : '',
+      stats.blessed
+        ? ` · ${t('combat.blessed', { time: duration(state.blessingRemaining) })}`
+        : '',
     );
 
     setHidden(this.ref('boosts'), !this.adsAvailable);
     if (this.adsAvailable) {
-      setText(this.ref('chestButton'), t('boost.chest', { amount: this.num(chestValue(state)) }));
+      setText(
+        this.ref('chestButton'),
+        t('boost.chest', { amount: this.num(chestValue(state)) }),
+      );
       setText(
         this.ref('blessingButton'),
         t('boost.blessing', { minutes: Math.round(BLESSING_DURATION_SECONDS / 60) }),
@@ -505,7 +520,10 @@ export class GameView {
     if (this.tab === 'party') this.updateParty();
     if (this.tab === 'descend') this.updateDescend();
 
-    setText(this.ref('notationButton'), t('settings.notation', { mode: t(`notation.${this.notation}`) }));
+    setText(
+      this.ref('notationButton'),
+      t('settings.notation', { mode: t(`notation.${this.notation}`) }),
+    );
     setText(this.ref('languageButton'), t('settings.language'));
   }
 
@@ -541,7 +559,9 @@ export class GameView {
           ? Math.max(1, affordableLevels(definition, level, this.state.gold))
           : this.quantity;
       const capacity =
-        definition.maxLevel === undefined ? wanted : Math.min(wanted, definition.maxLevel - level);
+        definition.maxLevel === undefined
+          ? wanted
+          : Math.min(wanted, definition.maxLevel - level);
       const price = upgradeBulkCost(definition, level, Math.max(1, capacity));
 
       setText(row.cost, this.num(price));
@@ -587,7 +607,7 @@ export class GameView {
     );
 
     const stats = this.state.stats;
-    const lines: Array<[string, string]> = [
+    const lines: [string, string][] = [
       [t('stats.deepest'), String(this.state.highestFloor)],
       [t('stats.descents'), String(stats.descents)],
       [t('stats.kills'), this.num(stats.totalKills)],

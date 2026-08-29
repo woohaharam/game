@@ -20,9 +20,20 @@ export interface KeyValueStore {
   readonly durable: boolean;
 }
 
+/**
+ * `lib.dom` declares `localStorage` as always present, which is not true of
+ * every environment this code is compiled for — it is absent under Node, where
+ * the tests run, and absent in some embedded webviews. Reading it through a
+ * deliberately weaker type keeps the guard below meaningful instead of leaving
+ * it as code the compiler believes is unreachable.
+ */
+interface StorageGlobals {
+  localStorage?: Storage | null;
+}
+
 function probeLocalStorage(): Storage | null {
   try {
-    const storage = globalThis.localStorage;
+    const { localStorage: storage } = globalThis as unknown as StorageGlobals;
     if (storage === undefined || storage === null) return null;
     // Some browsers expose the object and reject writes; only a real write proves it.
     const probe = '__deepdelve_probe__';

@@ -13,7 +13,8 @@
 import { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
 
-export type CompanionId = 'torchbearer' | 'houndmaster' | 'runesmith' | 'revenant' | 'archivist';
+export type CompanionId =
+  'torchbearer' | 'houndmaster' | 'runesmith' | 'revenant' | 'archivist';
 
 export interface CompanionDefinition {
   readonly id: CompanionId;

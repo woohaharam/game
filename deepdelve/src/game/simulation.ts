@@ -130,7 +130,9 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
   let events = 0;
 
   const award = (amount: Decimal, count: number): void => {
-    goldEarned = goldEarned.add(amount.multiply(stats.goldMultiplier).multiply(Decimal.of(count, 0)));
+    goldEarned = goldEarned.add(
+      amount.multiply(stats.goldMultiplier).multiply(Decimal.of(count, 0)),
+    );
   };
 
   while (remaining > TIME_EPSILON) {

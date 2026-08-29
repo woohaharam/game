@@ -12,7 +12,14 @@
  * available", never to "reward granted" and never to an exception.
  */
 
-import { DebugAdProvider, NoAdsProvider, PacedAdProvider, type AdPlacement, type AdProvider, type RewardOutcome } from './ads';
+import {
+  DebugAdProvider,
+  NoAdsProvider,
+  PacedAdProvider,
+  type AdPlacement,
+  type AdProvider,
+  type RewardOutcome,
+} from './ads';
 
 // -- CrazyGames ------------------------------------------------------------
 
@@ -143,10 +150,19 @@ class PokiProvider implements AdProvider {
 
 // -- detection -------------------------------------------------------------
 
+/**
+ * The globals as they actually arrive, which is not as they are documented.
+ *
+ * Every field is optional *and* nullable: a portal wrapper that failed to
+ * initialise leaves `PokiSDK = null` rather than leaving it undefined, and a
+ * type that admits only `undefined` turns the runtime null check into code the
+ * compiler believes is unreachable. Being honest here is what makes the guards
+ * below mean something.
+ */
 interface PortalGlobals {
-  CrazyGames?: { SDK?: CrazyGamesSdk };
-  PokiSDK?: PokiSdk;
-  location?: { search?: string };
+  CrazyGames?: { SDK?: CrazyGamesSdk | null } | null;
+  PokiSDK?: PokiSdk | null;
+  location?: { search?: string } | null;
 }
 
 export interface AdProviderHooks {

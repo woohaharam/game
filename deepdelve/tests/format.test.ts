@@ -67,7 +67,9 @@ describe('formatNumber', () => {
       expect(text).not.toContain('e+');
       expect(text).not.toContain('Infinity');
       expect(text).not.toContain('NaN');
-      expect(text.startsWith('1.5') || text.startsWith('15') || text.startsWith('150')).toBe(true);
+      expect(text.startsWith('1.5') || text.startsWith('15') || text.startsWith('150')).toBe(
+        true,
+      );
     }
   });
 

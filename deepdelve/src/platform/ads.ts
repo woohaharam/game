@@ -20,7 +20,10 @@ export type AdPlacement = 'offline-double' | 'blessing' | 'chest';
 
 export type RewardOutcome =
   | { readonly granted: true }
-  | { readonly granted: false; readonly reason: 'dismissed' | 'unavailable' | 'error' | 'throttled' };
+  | {
+      readonly granted: false;
+      readonly reason: 'dismissed' | 'unavailable' | 'error' | 'throttled';
+    };
 
 export interface AdProvider {
   /** For diagnostics and the credits screen. */
@@ -151,17 +154,25 @@ export class NoAdsProvider implements AdProvider {
     return false;
   }
 
-  async showRewarded(): Promise<RewardOutcome> {
-    return { granted: false, reason: 'unavailable' };
+  showRewarded(): Promise<RewardOutcome> {
+    return Promise.resolve({ granted: false, reason: 'unavailable' });
   }
 
-  async showInterstitial(): Promise<void> {
-    // Nothing to show.
+  showInterstitial(): Promise<void> {
+    return Promise.resolve();
   }
 
-  gameplayStart(): void {}
-  gameplayStop(): void {}
-  loadingFinished(): void {}
+  gameplayStart(): void {
+    // No portal to tell, and nothing of our own to pause.
+  }
+
+  gameplayStop(): void {
+    // As above.
+  }
+
+  loadingFinished(): void {
+    // As above.
+  }
 }
 
 /**
@@ -178,13 +189,23 @@ export class DebugAdProvider implements AdProvider {
     return true;
   }
 
-  async showRewarded(): Promise<RewardOutcome> {
-    return { granted: true };
+  showRewarded(): Promise<RewardOutcome> {
+    return Promise.resolve({ granted: true });
   }
 
-  async showInterstitial(): Promise<void> {}
+  showInterstitial(): Promise<void> {
+    return Promise.resolve();
+  }
 
-  gameplayStart(): void {}
-  gameplayStop(): void {}
-  loadingFinished(): void {}
+  gameplayStart(): void {
+    // Nothing to report to; the debug provider exists to grant, not to notify.
+  }
+
+  gameplayStop(): void {
+    // As above.
+  }
+
+  loadingFinished(): void {
+    // As above.
+  }
 }

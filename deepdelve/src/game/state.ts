@@ -11,7 +11,12 @@
 import { Decimal } from '@core/decimal';
 import { COMPANIONS, type CompanionId } from './content/companions';
 import { UPGRADES, type UpgradeId } from './content/upgrades';
-import { BOSS_TIME_LIMIT, KILLS_PER_FLOOR, guardianHealth, monsterHealth } from './content/floors';
+import {
+  BOSS_TIME_LIMIT,
+  KILLS_PER_FLOOR,
+  guardianHealth,
+  monsterHealth,
+} from './content/floors';
 
 export interface RunStatistics {
   totalKills: number;

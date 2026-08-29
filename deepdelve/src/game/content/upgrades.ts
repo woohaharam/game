@@ -15,13 +15,7 @@
 import { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
 
-export type UpgradeId =
-  | 'blade'
-  | 'swiftness'
-  | 'precision'
-  | 'ferocity'
-  | 'greed'
-  | 'tome';
+export type UpgradeId = 'blade' | 'swiftness' | 'precision' | 'ferocity' | 'greed' | 'tome';
 
 export interface UpgradeDefinition {
   readonly id: UpgradeId;

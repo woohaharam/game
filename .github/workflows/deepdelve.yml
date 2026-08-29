@@ -41,6 +41,14 @@ jobs:
 
       # Each step runs even when an earlier one fails, so a contributor sees
       # every problem in one CI round rather than one per push.
+      - name: Formatting
+        if: ${{ !cancelled() }}
+        run: npm run format:check
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
       - name: Typecheck
         if: ${{ !cancelled() }}
         run: npm run typecheck

@@ -14,8 +14,8 @@
 
 import { Decimal } from '@core/decimal';
 import type { KeyValueStore } from '@core/storage';
-import { COMPANIONS, type CompanionId } from './content/companions';
-import { UPGRADES, type UpgradeId } from './content/upgrades';
+import { COMPANIONS } from './content/companions';
+import { UPGRADES } from './content/upgrades';
 import { createInitialState, type GameState } from './state';
 
 export const SAVE_VERSION = 1;
@@ -91,49 +91,50 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
   const raw = asObject(parsed);
   if (Object.keys(raw).length === 0) return { state: fresh, loaded: false, repaired: true };
 
-  const version = asCount(raw['v'], 0);
+  const version = asCount(raw.v, 0);
   const migrated = migrate(raw, version);
   const state = fresh;
   let repaired = version !== SAVE_VERSION;
 
-  state.floor = Math.max(1, asCount(migrated['floor'], 1));
-  state.highestFloor = asCount(migrated['highestFloor'], 0);
-  state.killsOnFloor = asCount(migrated['killsOnFloor'], 0);
-  state.fightingGuardian = migrated['fightingGuardian'] === true;
-  state.guardianTimeRemaining = Math.max(0, asFiniteNumber(migrated['guardianTimeRemaining'], 30));
-  state.enemyIndex = asCount(migrated['enemyIndex'], 0);
-  state.gold = asDecimal(migrated['gold']);
-  state.lifetimeGold = asDecimal(migrated['lifetimeGold']).max(state.gold);
-  state.relics = asDecimal(migrated['relics']);
-  state.lifetimeRelics = asDecimal(migrated['lifetimeRelics']).max(state.relics);
-  state.blessingRemaining = Math.max(0, asFiniteNumber(migrated['blessingRemaining'], 0));
+  state.floor = Math.max(1, asCount(migrated.floor, 1));
+  state.highestFloor = asCount(migrated.highestFloor, 0);
+  state.killsOnFloor = asCount(migrated.killsOnFloor, 0);
+  state.fightingGuardian = migrated.fightingGuardian === true;
+  state.guardianTimeRemaining = Math.max(0, asFiniteNumber(migrated.guardianTimeRemaining, 30));
+  state.enemyIndex = asCount(migrated.enemyIndex, 0);
+  state.gold = asDecimal(migrated.gold);
+  state.lifetimeGold = asDecimal(migrated.lifetimeGold).max(state.gold);
+  state.relics = asDecimal(migrated.relics);
+  state.lifetimeRelics = asDecimal(migrated.lifetimeRelics).max(state.relics);
+  state.blessingRemaining = Math.max(0, asFiniteNumber(migrated.blessingRemaining, 0));
 
-  const health = asDecimal(migrated['enemyHealthRemaining']);
+  const health = asDecimal(migrated.enemyHealthRemaining);
   // A zero here would be indistinguishable from an enemy at death's door, which
   // would hand out a free kill on every load.
-  state.enemyHealthRemaining = health.isZero || health.isNegative ? fresh.enemyHealthRemaining : health;
+  state.enemyHealthRemaining =
+    health.isZero || health.isNegative ? fresh.enemyHealthRemaining : health;
 
-  const upgrades = asObject(migrated['upgrades']);
+  const upgrades = asObject(migrated.upgrades);
   for (const upgrade of UPGRADES) {
     const level = asCount(upgrades[upgrade.id], 0);
     const capped = upgrade.maxLevel === undefined ? level : Math.min(level, upgrade.maxLevel);
     if (capped !== level) repaired = true;
-    state.upgrades[upgrade.id as UpgradeId] = capped;
+    state.upgrades[upgrade.id] = capped;
   }
 
-  const companions = asObject(migrated['companions']);
+  const companions = asObject(migrated.companions);
   for (const companion of COMPANIONS) {
-    state.companions[companion.id as CompanionId] = asCount(companions[companion.id], 0);
+    state.companions[companion.id] = asCount(companions[companion.id], 0);
   }
 
-  const stats = asObject(migrated['stats']);
-  state.stats.totalKills = asCount(stats['totalKills'], 0);
-  state.stats.guardiansFelled = asCount(stats['guardiansFelled'], 0);
-  state.stats.guardiansEscaped = asCount(stats['guardiansEscaped'], 0);
-  state.stats.descents = asCount(stats['descents'], 0);
-  state.stats.playSeconds = Math.max(0, asFiniteNumber(stats['playSeconds'], 0));
+  const stats = asObject(migrated.stats);
+  state.stats.totalKills = asCount(stats.totalKills, 0);
+  state.stats.guardiansFelled = asCount(stats.guardiansFelled, 0);
+  state.stats.guardiansEscaped = asCount(stats.guardiansEscaped, 0);
+  state.stats.descents = asCount(stats.descents, 0);
+  state.stats.playSeconds = Math.max(0, asFiniteNumber(stats.playSeconds, 0));
 
-  state.lastSeen = asFiniteNumber(migrated['lastSeen'], now);
+  state.lastSeen = asFiniteNumber(migrated.lastSeen, now);
   // A save claiming to come from the future is either a clock change or an
   // edit; either way, crediting offline time against it would be wrong.
   if (state.lastSeen > now) {
@@ -159,7 +160,7 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
  * format that never had them means guessing what old saves looked like.
  */
 function migrate(raw: Unknown, version: number): Unknown {
-  let current = raw;
+  const current = raw;
   let at = version;
 
   // Saves written before versioning (or with a mangled version field) are read

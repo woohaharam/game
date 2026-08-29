@@ -29,7 +29,9 @@ const context = await browser.newContext({
 const errors = [];
 context.on('page', (p) => {
   p.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  p.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+  });
 });
 
 const page = await context.newPage();
@@ -52,7 +54,10 @@ for (let i = 0; i < 8; i += 1) {
   const buttons = await page.$$(
     '.panel:not([hidden]) .rows .row:not([hidden]) button.buy:not([disabled])',
   );
-  if (buttons.length === 0) { await page.waitForTimeout(1500); continue; }
+  if (buttons.length === 0) {
+    await page.waitForTimeout(1500);
+    continue;
+  }
   await buttons[0].click();
   await page.waitForTimeout(200);
 }
@@ -60,7 +65,9 @@ console.log('bought  ', JSON.stringify(await read()));
 
 await page.click('.qty-select button:text-is("최대")');
 await page.waitForTimeout(2500);
-const maxLabel = await page.textContent('.panel:not([hidden]) .rows .row:not([hidden]) button.buy');
+const maxLabel = await page.textContent(
+  '.panel:not([hidden]) .rows .row:not([hidden]) button.buy',
+);
 console.log('MAX button label:', maxLabel.trim());
 
 console.log('boosts visible:', await page.isVisible('.boosts'));
@@ -78,19 +85,26 @@ console.log('chest gold:', goldBefore, '->', await page.textContent('.purse stro
 const renderedPanels = () =>
   page.$$eval('.panel', (ps) => ps.filter((p) => p.getBoundingClientRect().height > 0).length);
 const renderedRows = () =>
-  page.$$eval('.rows .row', (rs) => rs.filter((r) => r.getBoundingClientRect().height > 0).length);
-
+  page.$$eval(
+    '.rows .row',
+    (rs) => rs.filter((r) => r.getBoundingClientRect().height > 0).length,
+  );
 
 for (const tab of ['동료', '심연', '강화']) {
   await page.click(`nav.tabs button:text-is("${tab}")`);
   await page.waitForTimeout(250);
-  console.log(`tab ${tab}: panels rendered = ${await renderedPanels()}, rows = ${await renderedRows()}`);
+  console.log(
+    `tab ${tab}: panels rendered = ${await renderedPanels()}, rows = ${await renderedRows()}`,
+  );
 }
 
 await page.click('nav.tabs button:text-is("심연")');
 await page.waitForTimeout(300);
 console.log('descend hint:', (await page.textContent('.panel:not([hidden]) .lock')).trim());
-console.log('stat values:', (await page.$$eval('.stats-card dd', (n) => n.map((x) => x.textContent))).join(' | '));
+console.log(
+  'stat values:',
+  (await page.$$eval('.stats-card dd', (n) => n.map((x) => x.textContent))).join(' | '),
+);
 
 await page.waitForTimeout(5000);
 const before = await read();
@@ -131,16 +145,34 @@ await returning.click('nav.tabs button:text-is("심연")');
 await returning.waitForTimeout(200);
 await returning.click('.settings button:text-is("언어: 한국어")');
 await returning.waitForTimeout(400);
-console.log('after toggle — tabs:', (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '));
-console.log('after toggle — lang/title:', await returning.getAttribute('html', 'lang'), '|', await returning.title());
+console.log(
+  'after toggle — tabs:',
+  (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '),
+);
+console.log(
+  'after toggle — lang/title:',
+  await returning.getAttribute('html', 'lang'),
+  '|',
+  await returning.title(),
+);
 console.log('run preserved:', depthBefore, '->', await returning.textContent('.depth'));
 await returning.click('.settings button:text-is("Language: English")');
 await returning.waitForTimeout(400);
-console.log('back to Korean:', (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '));
+console.log(
+  'back to Korean:',
+  (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '),
+);
 
 await returning.click('nav.tabs button:text-is("강화")');
 await returning.waitForTimeout(300);
-console.log('shop rows:', (await returning.$$eval('.panel:not([hidden]) .row:not([hidden]) .name', (n) => n.map((x) => x.textContent.trim()))).join(' | '));
+console.log(
+  'shop rows:',
+  (
+    await returning.$$eval('.panel:not([hidden]) .row:not([hidden]) .name', (n) =>
+      n.map((x) => x.textContent.trim()),
+    )
+  ).join(' | '),
+);
 
 console.log(errors.length === 0 ? 'NO PAGE ERRORS' : 'ERRORS:\n' + errors.join('\n'));
 await browser.close();
