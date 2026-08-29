@@ -151,10 +151,15 @@ local testing and is never selected automatically.
 ## History
 
 This repository previously held a second game, a 2D action roguelike called Neon
-Depths. It is tagged `neon-depths-final` and one checkout brings it back:
+Depths — a custom engine with a fixed-timestep loop, seeded determinism, replays
+recorded as decisions and replayed by re-simulation, a procedural generator with
+a reachability guarantee, and a headless balance bot.
+
+It was removed from the working tree, not from history. Commit `49a4390` is the
+last one that contains it, and one checkout brings it back:
 
 ```bash
-git checkout neon-depths-final -- src tests tools index.html vite.config.ts
+git checkout 49a4390 -- src tests tools index.html vite.config.ts
 ```
 
 ## License
