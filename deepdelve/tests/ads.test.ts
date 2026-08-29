@@ -24,6 +24,7 @@ function countingProvider(outcome: RewardOutcome = { granted: true }): AdProvide
     name: 'fake',
     rewarded: 0,
     interstitials: 0,
+    initialise: () => Promise.resolve(),
     rewardedAvailable: () => true,
     async showRewarded() {
       this.rewarded += 1;
@@ -63,6 +64,7 @@ describe('ad pacing', () => {
     const gate: { release: () => void } = { release: () => {} };
     const inner: AdProvider = {
       name: 'slow',
+      initialise: () => Promise.resolve(),
       rewardedAvailable: () => true,
       showRewarded: () =>
         new Promise<RewardOutcome>((resolve) => {
@@ -88,6 +90,7 @@ describe('ad pacing', () => {
     const clock = new FakeClock();
     const inner: AdProvider = {
       name: 'broken',
+      initialise: () => Promise.resolve(),
       rewardedAvailable: () => true,
       showRewarded: () => Promise.reject(new Error('sdk exploded')),
       showInterstitial: () => Promise.reject(new Error('sdk exploded')),
@@ -106,6 +109,7 @@ describe('ad pacing', () => {
     const onAdEnd = vi.fn();
     const inner: AdProvider = {
       name: 'broken',
+      initialise: () => Promise.resolve(),
       rewardedAvailable: () => true,
       showRewarded: () => Promise.reject(new Error('nope')),
       showInterstitial: async () => {},
@@ -143,6 +147,7 @@ describe('portal detection', () => {
     });
 
     expect(provider.name).toBe('crazygames');
+    await provider.initialise();
     expect(await provider.showRewarded('blessing')).toEqual({ granted: true });
     expect(requestAd).toHaveBeenCalledWith('rewarded', expect.anything());
   });
@@ -158,6 +163,7 @@ describe('portal detection', () => {
         },
       },
     });
+    await provider.initialise();
     expect(await provider.showRewarded('chest')).toEqual({
       granted: false,
       reason: 'dismissed',
@@ -167,6 +173,7 @@ describe('portal detection', () => {
   it('honours Poki reporting that the player skipped', async () => {
     const provider = detectAdProvider({ PokiSDK: { rewardedBreak: async () => false } });
     expect(provider.name).toBe('poki');
+    await provider.initialise();
     expect(await provider.showRewarded('chest')).toEqual({
       granted: false,
       reason: 'dismissed',
@@ -197,5 +204,59 @@ describe('portal detection', () => {
 
   it('grants immediately in debug, so reward flows can be exercised offline', async () => {
     expect(await new DebugAdProvider().showRewarded()).toEqual({ granted: true });
+  });
+});
+
+describe('SDK initialisation', () => {
+  it('reports no inventory until the SDK has finished initialising', async () => {
+    // Held in an object, not a `let`: the assignment happens inside a callback
+    // that control-flow analysis cannot see.
+    const opener: { release: () => void } = { release: () => {} };
+    const gate = new Promise<void>((resolve) => {
+      opener.release = resolve;
+    });
+
+    const provider = detectAdProvider({
+      CrazyGames: { SDK: { init: () => gate, ad: { requestAd: () => undefined } } },
+    });
+
+    // The API is present from the first frame, but calling it before init
+    // resolves fails rather than queueing — so offering the button now would
+    // teach the player the reward is broken.
+    expect(provider.rewardedAvailable()).toBe(false);
+
+    const initialising = provider.initialise();
+    opener.release();
+    await initialising;
+
+    expect(provider.rewardedAvailable()).toBe(true);
+  });
+
+  it('survives an SDK whose init rejects, without offering ads', async () => {
+    // What an ad blocker looks like from in here.
+    const provider = detectAdProvider({
+      PokiSDK: {
+        init: () => Promise.reject(new Error('blocked')),
+        rewardedBreak: () => Promise.resolve(true),
+      },
+    });
+
+    await expect(provider.initialise()).resolves.toBeUndefined();
+    expect(provider.rewardedAvailable()).toBe(false);
+  });
+
+  it('treats an SDK with no init step as ready', async () => {
+    const provider = detectAdProvider({
+      CrazyGames: { SDK: { ad: { requestAd: () => undefined } } },
+    });
+
+    await provider.initialise();
+    expect(provider.rewardedAvailable()).toBe(true);
+  });
+
+  it('needs no initialisation when there is no portal', async () => {
+    const provider = detectAdProvider({});
+    await expect(provider.initialise()).resolves.toBeUndefined();
+    expect(provider.rewardedAvailable()).toBe(false);
   });
 });

@@ -267,6 +267,15 @@ function boot(): void {
   view.setAdsAvailable(provider.rewardedAvailable());
   view.mount();
 
+  // The SDK is not usable the instant its script tag lands, so the game starts
+  // without waiting and the reward buttons appear when inventory does. Blocking
+  // the first frame on a network round trip to a portal's backend — which may
+  // never answer, if the player is running an ad blocker — would trade a
+  // certain delay for an uncertain reward.
+  void provider.initialise().then(() => {
+    view.setAdsAvailable(provider.rewardedAvailable());
+  });
+
   /** Credits wall-clock time the frame loop could not have seen. */
   function reconcile(): void {
     const result = applyOfflineProgress(state);

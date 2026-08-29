@@ -30,6 +30,7 @@ interface CrazyGamesAdCallbacks {
 }
 
 interface CrazyGamesSdk {
+  init?: () => Promise<void>;
   ad?: { requestAd?: (type: 'rewarded' | 'midgame', callbacks: CrazyGamesAdCallbacks) => void };
   game?: {
     gameplayStart?: () => void;
@@ -40,11 +41,30 @@ interface CrazyGamesSdk {
 
 class CrazyGamesProvider implements AdProvider {
   readonly name = 'crazygames';
+  private ready = false;
 
   constructor(private readonly sdk: CrazyGamesSdk) {}
 
+  async initialise(): Promise<void> {
+    const init = this.sdk.init;
+    if (typeof init !== 'function') {
+      // An older SDK with no init step, or a shape we do not recognise. The
+      // feature detection in `rewardedAvailable` still decides the outcome.
+      this.ready = true;
+      return;
+    }
+
+    try {
+      await init.call(this.sdk);
+      this.ready = true;
+    } catch {
+      // Ad-blocked, offline, or the portal declined. No inventory, no crash.
+      this.ready = false;
+    }
+  }
+
   rewardedAvailable(): boolean {
-    return typeof this.sdk.ad?.requestAd === 'function';
+    return this.ready && typeof this.sdk.ad?.requestAd === 'function';
   }
 
   showRewarded(_placement: AdPlacement): Promise<RewardOutcome> {
@@ -99,6 +119,7 @@ class CrazyGamesProvider implements AdProvider {
 // -- Poki ------------------------------------------------------------------
 
 interface PokiSdk {
+  init?: () => Promise<unknown>;
   rewardedBreak?: () => Promise<boolean>;
   commercialBreak?: () => Promise<void>;
   gameplayStart?: () => void;
@@ -108,11 +129,30 @@ interface PokiSdk {
 
 class PokiProvider implements AdProvider {
   readonly name = 'poki';
+  private ready = false;
 
   constructor(private readonly sdk: PokiSdk) {}
 
+  async initialise(): Promise<void> {
+    const init = this.sdk.init;
+    if (typeof init !== 'function') {
+      this.ready = true;
+      return;
+    }
+
+    try {
+      // Poki resolves this even when the player is running an ad blocker; the
+      // documented behaviour is to carry on either way, so a rejection is
+      // treated as "no inventory" rather than as a reason to stop.
+      await init.call(this.sdk);
+      this.ready = true;
+    } catch {
+      this.ready = false;
+    }
+  }
+
   rewardedAvailable(): boolean {
-    return typeof this.sdk.rewardedBreak === 'function';
+    return this.ready && typeof this.sdk.rewardedBreak === 'function';
   }
 
   async showRewarded(_placement: AdPlacement): Promise<RewardOutcome> {

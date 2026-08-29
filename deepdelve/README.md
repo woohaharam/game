@@ -135,8 +135,17 @@ by `npm run balance -- --write`.
 
 ## Publishing to a portal
 
+```bash
+npm run build              # no SDK — GitHub Pages, itch.io, local
+npm run build:crazygames   # CrazyGames submission
+npm run build:poki         # Poki submission
+```
+
 The build is fully relative (`base: './'`), so it runs from any subdirectory.
-Portals inject their SDK with a script tag around the build; `detectAdProvider`
-picks it up at boot and falls back to no ads when there is nothing there.
-`?ads=debug` grants rewards instantly for local testing and is never selected
-automatically.
+Each portal target injects that portal's SDK script; `detectAdProvider` finds
+the global at boot, waits for the SDK's own async initialisation, and falls back
+to no ads when there is nothing there. `?ads=debug` grants rewards instantly for
+local testing and is never selected automatically.
+
+How the revenue actually works, what to expect from it, and the pre-submission
+checklist are in [`docs/PUBLISHING.md`](docs/PUBLISHING.md).

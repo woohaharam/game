@@ -28,6 +28,19 @@ export type RewardOutcome =
 export interface AdProvider {
   /** For diagnostics and the credits screen. */
   readonly name: string;
+  /**
+   * Prepares the SDK, if it needs preparing.
+   *
+   * Most portal SDKs are not usable the moment their script tag lands: they
+   * hand back a promise that resolves once they have talked to their own
+   * backend. Calling `requestAd` before that resolves does not queue — it
+   * fails, and a game that treats that as "no inventory" shows no ads at all
+   * and earns nothing while looking like it works.
+   *
+   * Resolves rather than rejects on failure; the provider reports its own
+   * readiness through `rewardedAvailable`.
+   */
+  initialise(): Promise<void>;
   /** False when the UI should not offer rewarded buttons at all. */
   rewardedAvailable(): boolean;
   showRewarded(placement: AdPlacement): Promise<RewardOutcome>;
@@ -74,6 +87,10 @@ export class PacedAdProvider implements AdProvider {
 
   get name(): string {
     return this.inner.name;
+  }
+
+  initialise(): Promise<void> {
+    return this.inner.initialise();
   }
 
   private now(): number {
@@ -150,6 +167,10 @@ export class PacedAdProvider implements AdProvider {
 export class NoAdsProvider implements AdProvider {
   readonly name = 'none';
 
+  initialise(): Promise<void> {
+    return Promise.resolve();
+  }
+
   rewardedAvailable(): boolean {
     return false;
   }
@@ -184,6 +205,10 @@ export class NoAdsProvider implements AdProvider {
  */
 export class DebugAdProvider implements AdProvider {
   readonly name = 'debug';
+
+  initialise(): Promise<void> {
+    return Promise.resolve();
+  }
 
   rewardedAvailable(): boolean {
     return true;

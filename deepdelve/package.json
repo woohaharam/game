@@ -21,7 +21,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "balance": "vite-node tools/probe.ts"
+    "balance": "vite-node tools/probe.ts",
+    "build:crazygames": "npm run typecheck && DD_PORTAL=crazygames vite build",
+    "build:poki": "npm run typecheck && DD_PORTAL=poki vite build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
