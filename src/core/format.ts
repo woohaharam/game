@@ -214,6 +214,44 @@ export function formatMultiplier(value: Decimal | number): string {
   return `×${formatNumber(decimal, { places: 2 })}`;
 }
 
+/**
+ * Mass, in grams, rendered in the largest unit that leaves a readable number.
+ *
+ * The stone's mass is the number the player watches for hours, and "4.2 tonnes"
+ * lands where "4,200,000 g" does not — the unit does the work of conveying
+ * scale that a bare digit string cannot. Past the point where human units run
+ * out the table switches to astronomical ones, which is the moment the game is
+ * really about: a stone measured in Earths is a different feeling from one
+ * measured in gigatonnes, and it costs one row in a table to say so.
+ *
+ * `units` is passed in rather than looked up so this module stays free of any
+ * dependency on the locale layer.
+ */
+export interface MassUnit {
+  /** Grams in one of this unit, as a power of ten. */
+  readonly exponent: number;
+  readonly label: string;
+}
+
+export function formatMass(
+  grams: Decimal | number,
+  units: readonly MassUnit[],
+  options: FormatOptions = {},
+): string {
+  const value = Decimal.from(grams);
+  if (value.isZero || value.isNegative) return `0${units[0]?.label ?? ''}`;
+
+  // The largest unit the value is at least one of; the first otherwise.
+  let chosen = units[0];
+  for (const unit of units) {
+    if (value.exponent >= unit.exponent) chosen = unit;
+  }
+  if (chosen === undefined) return formatNumber(value, options);
+
+  const scaled = Decimal.of(value.mantissa, value.exponent - chosen.exponent);
+  return `${formatNumber(scaled, options)}${chosen.label}`;
+}
+
 /** `0.0%`..`100.0%`, clamped, for progress readouts. */
 export function formatPercent(fraction: number, places = 1): string {
   const clamped = Math.min(1, Math.max(0, Number.isFinite(fraction) ? fraction : 0));

@@ -1,5 +1,5 @@
 /**
- * The descent panel: what surrendering the run is worth, and what it costs.
+ * The compression panel: what collapsing the stone is worth, and what it costs.
  *
  * Also carries the settings, which belong here rather than behind a gear icon:
  * this is the only screen a player already visits deliberately, and burying
@@ -10,7 +10,7 @@
 import type { Decimal } from '@core/decimal';
 import type { Notation } from '@core/format';
 import { duration, getLocale, t, type Locale } from '@core/i18n';
-import { DESCENT_UNLOCK_FLOOR, canDescend, pendingRelics } from '@game/prestige';
+import { COMPRESSION_UNLOCK_STAGE, canCompress, pendingCrystals } from '@game/prestige';
 import type { GameState } from '@game/state';
 import { el, setDisabled, setText } from '../dom';
 
@@ -18,7 +18,7 @@ export interface DescendPanelDeps {
   readonly state: GameState;
   readonly num: (value: Decimal | number) => string;
   readonly notation: () => Notation;
-  readonly onDescend: () => void;
+  readonly onCompress: () => void;
   readonly onCycleNotation: () => void;
   readonly onLanguageChange: (locale: Locale) => void;
   readonly onWipe: () => void;
@@ -43,7 +43,7 @@ export class DescendPanel {
 
   mount(): HTMLElement {
     this.button = el('button', { class: 'descend', type: 'button' }, [t('descend.button')]);
-    this.button.addEventListener('click', () => this.deps.onDescend());
+    this.button.addEventListener('click', () => this.deps.onCompress());
 
     const wipe = el('button', { class: 'danger', type: 'button' }, [t('settings.wipe')]);
     wipe.addEventListener('click', () => this.deps.onWipe());
@@ -100,13 +100,13 @@ export class DescendPanel {
     const state = this.deps.state;
     const num = this.deps.num;
 
-    setText(this.pending, num(pendingRelics(state.highestFloor)));
+    setText(this.pending, num(pendingCrystals(state.highestStage)));
 
-    const ready = canDescend(state);
+    const ready = canCompress(state);
     setDisabled(this.button, !ready);
     setText(
       this.hint,
-      ready ? t('descend.ready') : t('descend.locked', { n: DESCENT_UNLOCK_FLOOR }),
+      ready ? t('descend.ready') : t('descend.locked', { n: COMPRESSION_UNLOCK_STAGE }),
     );
 
     setText(
@@ -121,12 +121,11 @@ export class DescendPanel {
 
     const stats = state.stats;
     const lines: [string, string][] = [
-      [t('stats.deepest'), String(state.highestFloor)],
-      [t('stats.descents'), String(stats.descents)],
-      [t('stats.kills'), num(stats.totalKills)],
-      [t('stats.guardiansFelled'), num(stats.guardiansFelled)],
-      [t('stats.guardiansEscaped'), num(stats.guardiansEscaped)],
-      [t('stats.goldEarned'), num(state.lifetimeGold)],
+      [t('stats.deepest'), String(state.highestStage)],
+      [t('stats.descents'), String(stats.compressions)],
+      [t('stats.kills'), num(stats.totalFragments)],
+      [t('stats.guardiansFelled'), num(stats.stagesReached)],
+      [t('stats.goldEarned'), num(state.lifetimeDust)],
       [t('stats.timePlayed'), duration(stats.playSeconds)],
     ];
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Decimal, d } from '../src/core/decimal';
 import { advance } from '../src/game/simulation';
 import { createInitialState, type GameState } from '../src/game/state';
-import { KILLS_PER_FLOOR } from '../src/game/content/floors';
+import { FRAGMENTS_PER_STAGE } from '../src/game/content/stages';
 
 function heroWith(power: Partial<GameState['upgrades']> = {}): GameState {
   const state = createInitialState(0);
@@ -23,9 +23,9 @@ describe('advance', () => {
     const state = heroWith({ blade: 20, swiftness: 10 });
     const report = advance(state, 600);
 
-    expect(report.kills).toBeGreaterThan(0);
-    expect(report.goldEarned.isZero).toBe(false);
-    expect(state.floor).toBeGreaterThan(1);
+    expect(report.fragments).toBeGreaterThan(0);
+    expect(report.dustGathered.isZero).toBe(false);
+    expect(state.stage).toBeGreaterThan(1);
     expect(report.truncated).toBe(false);
     expect(report.seconds).toBeCloseTo(600, 6);
   });
@@ -33,8 +33,8 @@ describe('advance', () => {
   it('banks gold into the state exactly once', () => {
     const state = heroWith({ blade: 15 });
     const report = advance(state, 120);
-    expect(relativeGap(state.gold, report.goldEarned)).toBeLessThan(1e-12);
-    expect(relativeGap(state.lifetimeGold, report.goldEarned)).toBeLessThan(1e-12);
+    expect(relativeGap(state.dust, report.dustGathered)).toBeLessThan(1e-12);
+    expect(relativeGap(state.lifetimeDust, report.dustGathered)).toBeLessThan(1e-12);
   });
 
   /**
@@ -54,12 +54,12 @@ describe('advance', () => {
       advance(asFrames, Math.min(frame, totalSeconds - elapsed));
     }
 
-    expect(asFrames.floor).toBe(asOneStep.floor);
-    expect(asFrames.highestFloor).toBe(asOneStep.highestFloor);
-    expect(asFrames.killsOnFloor).toBe(asOneStep.killsOnFloor);
-    expect(asFrames.fightingGuardian).toBe(asOneStep.fightingGuardian);
-    expect(asFrames.stats.totalKills).toBe(asOneStep.stats.totalKills);
-    expect(relativeGap(asFrames.gold, asOneStep.gold)).toBeLessThan(1e-9);
+    expect(asFrames.stage).toBe(asOneStep.stage);
+    expect(asFrames.highestStage).toBe(asOneStep.highestStage);
+    expect(asFrames.fragmentsOnStage).toBe(asOneStep.fragmentsOnStage);
+    expect(relativeGap(asFrames.mass, asOneStep.mass)).toBeLessThan(1e-9);
+    expect(asFrames.stats.totalFragments).toBe(asOneStep.stats.totalFragments);
+    expect(relativeGap(asFrames.dust, asOneStep.dust)).toBeLessThan(1e-9);
   });
 
   it('agrees across wildly different step sizes', () => {
@@ -75,9 +75,9 @@ describe('advance', () => {
     const [reference] = results;
     if (reference === undefined) throw new Error('no results');
     for (const result of results) {
-      expect(result.floor).toBe(reference.floor);
-      expect(result.stats.totalKills).toBe(reference.stats.totalKills);
-      expect(relativeGap(result.gold, reference.gold)).toBeLessThan(1e-9);
+      expect(result.stage).toBe(reference.stage);
+      expect(result.stats.totalFragments).toBe(reference.stats.totalFragments);
+      expect(relativeGap(result.dust, reference.dust)).toBeLessThan(1e-9);
     }
   });
 
@@ -87,14 +87,14 @@ describe('advance', () => {
     // the first frame after loading.
     const state = heroWith({ blade: 100_000 });
     const report = advance(state, 10);
-    expect(report.kills).toBeLessThanOrEqual(10 / 0.05);
+    expect(report.fragments).toBeLessThanOrEqual(10 / 0.05);
   });
 
   it('never stalls when the hero overkills inside a single frame', () => {
     const state = heroWith({ blade: 100_000 });
     for (let i = 0; i < 600; i += 1) advance(state, 1 / 60);
-    expect(state.stats.totalKills).toBeGreaterThan(0);
-    expect(state.floor).toBeGreaterThan(1);
+    expect(state.stats.totalFragments).toBeGreaterThan(0);
+    expect(state.stage).toBeGreaterThan(1);
   });
 
   it('makes no progress for a hero who cannot deal damage', () => {
@@ -110,19 +110,44 @@ describe('advance', () => {
   it('stalls on a guardian it cannot beat without losing the floor', () => {
     const state = heroWith({ blade: 3 });
     advance(state, 60 * 60 * 4);
-    const reached = state.floor;
+    const reached = state.stage;
 
     advance(state, 60 * 60 * 4);
-    expect(state.floor).toBeGreaterThanOrEqual(reached);
-    expect(state.stats.guardiansEscaped).toBeGreaterThan(0);
-    // Being pushed back restarts the floor's trash, so the hero keeps earning.
-    expect(state.gold.isZero).toBe(false);
+    expect(state.stage).toBeGreaterThanOrEqual(reached);
+    // A stalled stone still gathers: slowing down is the wall, not stopping.
+    expect(state.dust.isZero).toBe(false);
   });
 
-  it('spawns the guardian only after the floor is cleared', () => {
+  /**
+   * The design's central promise, and the thing that separates this from the
+   * dungeon crawler it grew out of: a stone that has grown cannot un-grow.
+   * There is no timer to fail and no way back down, so the only thing a stage
+   * too heavy to absorb does is slow the player down.
+   */
+  it('never moves backwards, at any power level or step size', () => {
+    for (const power of [0, 1, 40, 5000]) {
+      for (const step of [1 / 60, 7, 3600]) {
+        const state = heroWith({ blade: power });
+        let stage = state.stage;
+        let mass = state.mass;
+
+        for (let i = 0; i < 200; i += 1) {
+          advance(state, step);
+          expect(state.stage, `blade ${power}, step ${step}`).toBeGreaterThanOrEqual(stage);
+          expect(state.mass.lessThan(mass), `blade ${power}, step ${step}`).toBe(false);
+          stage = state.stage;
+          mass = state.mass;
+        }
+      }
+    }
+  });
+
+  it('advances a stage only once the fragments for it have landed', () => {
     const state = heroWith({ blade: 5 });
     advance(state, 3);
-    expect(state.fightingGuardian).toBe(state.killsOnFloor >= KILLS_PER_FLOOR);
+    // Progress within a stage is the count, so the two can never disagree.
+    expect(state.fragmentsOnStage).toBeLessThan(FRAGMENTS_PER_STAGE);
+    expect(state.stage).toBe(1 + state.stats.stagesReached);
   });
 
   it('completes an eight-hour catch-up without hitting the event ceiling', () => {
@@ -150,9 +175,9 @@ describe('advance', () => {
     for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
       const report = advance(state, bad);
       expect(report.seconds).toBe(0);
-      expect(report.kills).toBe(0);
+      expect(report.fragments).toBe(0);
     }
-    expect(state.gold.isZero).toBe(true);
-    expect(d(state.floor).toNumber()).toBe(1);
+    expect(state.dust.isZero).toBe(true);
+    expect(d(state.stage).toNumber()).toBe(1);
   });
 });

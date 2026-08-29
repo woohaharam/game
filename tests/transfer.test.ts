@@ -19,8 +19,8 @@ describe('transfer codes', () => {
     if (!result.ok) return;
 
     const restored = decode(result.payload, 0).state;
-    expect(restored.floor).toBe(original.floor);
-    expect(restored.gold.serialise()).toBe(original.gold.serialise());
+    expect(restored.stage).toBe(original.stage);
+    expect(restored.dust.serialise()).toBe(original.dust.serialise());
     expect(restored.upgrades.blade).toBe(31);
   });
 
@@ -40,7 +40,7 @@ describe('transfer codes', () => {
 
   it('refuses a code with a single character changed', () => {
     const state = createInitialState(0);
-    state.gold = Decimal.of(1, 30);
+    state.dust = Decimal.of(1, 30);
     const code = toTransferCode(encode(state, 0));
 
     let caught = 0;
@@ -66,15 +66,15 @@ describe('transfer codes', () => {
 
   it('carries a save far past the double range intact', () => {
     const state = createInitialState(0);
-    state.gold = Decimal.of(7.25, 4000);
-    state.relics = Decimal.of(3.5, 1200);
+    state.dust = Decimal.of(7.25, 4000);
+    state.crystals = Decimal.of(3.5, 1200);
 
     const result = fromTransferCode(toTransferCode(encode(state, 0)));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     const restored = decode(result.payload, 0).state;
-    expect(restored.gold.exponent).toBe(4000);
-    expect(restored.relics.exponent).toBe(1200);
+    expect(restored.dust.exponent).toBe(4000);
+    expect(restored.crystals.exponent).toBe(1200);
   });
 });

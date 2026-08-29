@@ -11,32 +11,40 @@
 import { Decimal } from '@core/decimal';
 import { COMPANIONS, type CompanionId } from './content/companions';
 import { UPGRADES, type UpgradeId } from './content/upgrades';
-import { BOSS_TIME_LIMIT, guardianHealth, monsterHealth } from './content/floors';
+import { fragmentMass } from './content/stages';
 
 export interface RunStatistics {
-  totalKills: number;
-  guardiansFelled: number;
-  guardiansEscaped: number;
-  descents: number;
+  totalFragments: number;
+  stagesReached: number;
+  compressions: number;
   playSeconds: number;
 }
 
 export interface GameState {
-  /** The floor being fought on right now. Resets to 1 on descent. */
-  floor: number;
-  /** Deepest floor ever *cleared*, which is what relics are paid against. */
-  highestFloor: number;
-  killsOnFloor: number;
-  fightingGuardian: boolean;
-  guardianTimeRemaining: number;
-  enemyHealthRemaining: Decimal;
-  /** Cycles the displayed monster name so a floor is not ten identical rats. */
-  enemyIndex: number;
+  /** The stage being grown through right now. Resets to 1 on compression. */
+  stage: number;
+  /** Deepest stage ever reached, which is what crystals are paid against. */
+  highestStage: number;
+  fragmentsOnStage: number;
+  /** Mass left in the fragment currently being drawn in. */
+  fragmentRemaining: Decimal;
+  /** Cycles the displayed fragment name so a stage is not ten identical lumps. */
+  fragmentIndex: number;
 
-  gold: Decimal;
-  lifetimeGold: Decimal;
-  relics: Decimal;
-  lifetimeRelics: Decimal;
+  /**
+   * The stone's mass, in grams. Only ever goes up.
+   *
+   * Not a currency — it is the thing the player is growing, and the number they
+   * actually watch. Spending it would mean the stone shrinks when you improve
+   * it, which is the wrong feeling for the entire genre.
+   */
+  mass: Decimal;
+
+  /** The spendable currency, sieved out of fragments as they are absorbed. */
+  dust: Decimal;
+  lifetimeDust: Decimal;
+  crystals: Decimal;
+  lifetimeCrystals: Decimal;
 
   upgrades: Record<UpgradeId, number>;
   companions: Record<CompanionId, number>;
@@ -45,14 +53,14 @@ export interface GameState {
   blessingRemaining: number;
 
   /**
-   * Whether the hero spends gold without being asked.
+   * Whether the stone spends dust without being asked.
    *
-   * Unlocked by the first descent, which is the point where re-buying the same
-   * early upgrades stops being a decision and starts being a chore. Off by
-   * default even once unlocked: a player who wants to spend deliberately should
-   * not have that taken away.
+   * Unlocked by the first compression, which is the point where re-buying the
+   * same early refinements stops being a decision and starts being a chore. Off
+   * by default even once unlocked: a player who wants to spend deliberately
+   * should not have that taken away.
    */
-  autoDelve: boolean;
+  autoRefine: boolean;
 
   stats: RunStatistics;
   /** Epoch milliseconds of the last save, used to compute offline progress. */
@@ -73,68 +81,53 @@ function emptyCompanions(): Record<CompanionId, number> {
 
 export function createInitialState(now = Date.now()): GameState {
   return {
-    floor: 1,
-    highestFloor: 0,
-    killsOnFloor: 0,
-    fightingGuardian: false,
-    guardianTimeRemaining: BOSS_TIME_LIMIT,
-    enemyHealthRemaining: monsterHealth(1),
-    enemyIndex: 0,
-    gold: Decimal.ZERO,
-    lifetimeGold: Decimal.ZERO,
-    relics: Decimal.ZERO,
-    lifetimeRelics: Decimal.ZERO,
+    stage: 1,
+    highestStage: 0,
+    fragmentsOnStage: 0,
+    fragmentRemaining: fragmentMass(1),
+    fragmentIndex: 0,
+    mass: Decimal.ZERO,
+    dust: Decimal.ZERO,
+    lifetimeDust: Decimal.ZERO,
+    crystals: Decimal.ZERO,
+    lifetimeCrystals: Decimal.ZERO,
     upgrades: emptyUpgrades(),
     companions: emptyCompanions(),
     blessingRemaining: 0,
-    autoDelve: false,
+    autoRefine: false,
     stats: {
-      totalKills: 0,
-      guardiansFelled: 0,
-      guardiansEscaped: 0,
-      descents: 0,
+      totalFragments: 0,
+      stagesReached: 0,
+      compressions: 0,
       playSeconds: 0,
     },
     lastSeen: now,
   };
 }
 
-/** Puts a fresh trash monster in front of the hero on the current floor. */
-export function spawnMonster(state: GameState): void {
-  state.fightingGuardian = false;
-  state.enemyIndex += 1;
-  state.enemyHealthRemaining = monsterHealth(state.floor);
-}
-
-/** Starts the floor's guardian fight, with a fresh timer. */
-export function spawnGuardian(state: GameState): void {
-  state.fightingGuardian = true;
-  state.guardianTimeRemaining = BOSS_TIME_LIMIT;
-  state.enemyHealthRemaining = guardianHealth(state.floor);
+/** Draws a fresh fragment towards the stone at the current stage. */
+export function spawnFragment(state: GameState): void {
+  state.fragmentIndex += 1;
+  state.fragmentRemaining = fragmentMass(state.stage);
 }
 
 /**
- * Sends the hero back to the start of the current floor.
+ * Moves to the next stage.
  *
- * Failing a guardian costs progress on the floor but never the floor itself —
- * an idle game the player cannot leave running is not an idle game, so the
- * failure state has to be a stall, not a loss.
+ * There is no way back. A dungeon crawler can push a hero down a floor; a stone
+ * that has grown cannot un-grow, so the only thing a stage too heavy to absorb
+ * does is slow the player down. That is the genre's honest version of a wall,
+ * and it is why this game has no failure state at all.
  */
-export function retreatToFloorStart(state: GameState): void {
-  state.killsOnFloor = 0;
-  spawnMonster(state);
+export function growToNextStage(state: GameState): void {
+  state.highestStage = Math.max(state.highestStage, state.stage);
+  state.stage += 1;
+  state.fragmentsOnStage = 0;
+  spawnFragment(state);
 }
 
-/** Moves to the next floor after a guardian falls. */
-export function descendOneFloor(state: GameState): void {
-  state.highestFloor = Math.max(state.highestFloor, state.floor);
-  state.floor += 1;
-  state.killsOnFloor = 0;
-  spawnMonster(state);
-}
-
-export function maxHealthOfCurrentEnemy(state: GameState): Decimal {
-  return state.fightingGuardian ? guardianHealth(state.floor) : monsterHealth(state.floor);
+export function wholeFragmentMass(state: GameState): Decimal {
+  return fragmentMass(state.stage);
 }
 
 /**

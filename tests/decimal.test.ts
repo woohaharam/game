@@ -148,3 +148,60 @@ describe('Decimal', () => {
     expect(original.toNumber()).toBe(100);
   });
 });
+
+describe('comparison against zero', () => {
+  it('orders values below one correctly against zero', () => {
+    // Zero is stored with exponent 0, which is meaningless, so any comparison
+    // that reaches the exponent branch gets a value like 5.25e-2 backwards.
+    for (const exponent of [-1, -2, -8, -300]) {
+      const small = Decimal.of(5.25, exponent);
+      expect(small.greaterThan(Decimal.ZERO), `5.25e${exponent}`).toBe(true);
+      expect(small.lessThan(Decimal.ZERO), `5.25e${exponent}`).toBe(false);
+      expect(small.max(Decimal.ZERO).serialise()).toBe(small.serialise());
+      expect(small.min(Decimal.ZERO).isZero).toBe(true);
+    }
+  });
+
+  it('orders negative values below one correctly against zero', () => {
+    for (const exponent of [-1, -4, -120]) {
+      const small = Decimal.of(-3, exponent);
+      expect(small.lessThan(Decimal.ZERO), `-3e${exponent}`).toBe(true);
+      expect(small.greaterThan(Decimal.ZERO), `-3e${exponent}`).toBe(false);
+      expect(small.max(Decimal.ZERO).isZero).toBe(true);
+    }
+  });
+
+  it('is a total order over a spread of magnitudes and signs', () => {
+    const values = [
+      Decimal.of(-4, 200),
+      Decimal.of(-1, 0),
+      Decimal.of(-7, -50),
+      Decimal.ZERO,
+      Decimal.of(2, -300),
+      Decimal.of(9.9, -1),
+      Decimal.ONE,
+      Decimal.of(1.0001, 0),
+      Decimal.of(3, 40),
+    ];
+
+    // Sorting with the comparator must reproduce the order they are written in,
+    // which is the only property every caller — max, min, affordability, the
+    // shop's price correction — actually depends on.
+    const shuffled = [...values].reverse();
+    shuffled.sort((a, b) => a.compare(b));
+    expect(shuffled.map((v) => v.serialise())).toEqual(values.map((v) => v.serialise()));
+  });
+
+  it('agrees with itself in both directions', () => {
+    // Normalised because `Math.sign(0)` is `+0` while `-Math.sign(0)` is `-0`,
+    // and those are the same ordering answer even though `Object.is` disagrees.
+    const order = (value: number): -1 | 0 | 1 => (value < 0 ? -1 : value > 0 ? 1 : 0);
+
+    const values = [Decimal.ZERO, Decimal.of(5, -3), Decimal.of(-5, -3), Decimal.of(1, 100)];
+    for (const a of values) {
+      for (const b of values) {
+        expect(order(a.compare(b))).toBe(-order(b.compare(a)) || 0);
+      }
+    }
+  });
+});

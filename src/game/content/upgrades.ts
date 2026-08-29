@@ -1,5 +1,5 @@
 /**
- * Purchasable upgrades.
+ * Purchasable refinements.
  *
  * Every upgrade is data, not code: an id, a cost curve, and a pure function
  * from level to its contribution. Nothing here knows about the hero, the UI, or
@@ -16,55 +16,55 @@ export type UpgradeId = 'blade' | 'swiftness' | 'precision' | 'ferocity' | 'gree
 export interface UpgradeDefinition extends CostCurve {
   readonly id: UpgradeId;
   readonly icon: string;
-  /** Floors that must have been reached before this appears in the shop. */
-  readonly unlockFloor: number;
+  /** Stage that must have been reached before this appears. */
+  readonly unlockStage: number;
 }
 
 export const UPGRADES: readonly UpgradeDefinition[] = [
   {
     id: 'blade',
-    icon: '🗡️',
+    icon: '🕳️',
     baseCost: Decimal.of(1.5, 1),
     costGrowth: 1.14,
-    unlockFloor: 1,
+    unlockStage: 1,
   },
   {
     id: 'swiftness',
-    icon: '🌀',
+    icon: '🧲',
     baseCost: Decimal.of(6, 1),
     costGrowth: 1.19,
-    unlockFloor: 1,
+    unlockStage: 1,
   },
   {
     id: 'precision',
-    icon: '🎯',
+    icon: '📡',
     baseCost: Decimal.of(4, 2),
     costGrowth: 1.28,
-    unlockFloor: 3,
+    unlockStage: 3,
     // Crit chance is a probability; past 100% further levels would be a
     // silently worthless purchase, which is worse than an unavailable one.
     maxLevel: 140,
   },
   {
     id: 'ferocity',
-    icon: '💢',
+    icon: '📶',
     baseCost: Decimal.of(1.2, 3),
     costGrowth: 1.33,
-    unlockFloor: 6,
+    unlockStage: 6,
   },
   {
     id: 'greed',
-    icon: '💰',
+    icon: '⚗️',
     baseCost: Decimal.of(2, 2),
     costGrowth: 1.17,
-    unlockFloor: 2,
+    unlockStage: 2,
   },
   {
     id: 'tome',
-    icon: '📖',
+    icon: '⚫',
     baseCost: Decimal.of(2.5, 4),
     costGrowth: 1.45,
-    unlockFloor: 12,
+    unlockStage: 12,
   },
 ];
 

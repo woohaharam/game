@@ -198,8 +198,16 @@ export class Decimal {
   /** -1, 0 or 1. */
   compare(other: Decimal | number): number {
     const b = Decimal.from(other);
-    if (this.isZero && b.isZero) return 0;
-    if (this.mantissa < 0 !== b.mantissa < 0) return this.mantissa < 0 ? -1 : 1;
+
+    // Zero has to be settled before anything looks at exponents. It is stored
+    // as mantissa 0 with exponent 0, and that exponent is meaningless — so a
+    // small positive number like 5.25e-2 would otherwise be judged smaller than
+    // zero purely because -2 < 0. That made `x.max(Decimal.ZERO)` collapse every
+    // positive value below 1 to zero, silently, wherever it was used to clamp.
+    if (this.isZero) return b.isZero ? 0 : b.isNegative ? 1 : -1;
+    if (b.isZero) return this.isNegative ? -1 : 1;
+
+    if (this.isNegative !== b.isNegative) return this.isNegative ? -1 : 1;
 
     const sign = this.mantissa < 0 ? -1 : 1;
     if (this.exponent !== b.exponent) {

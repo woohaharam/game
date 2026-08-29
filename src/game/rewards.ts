@@ -7,7 +7,7 @@
  * flat number, so it stays meaningful at floor 5 and at floor 5,000 without
  * anyone retuning it.
  *
- * The second rule is why a chest is worth "thirty minutes of your current
+ * The second rule is why a cache is worth "thirty minutes of your current
  * income" rather than "10,000 gold". Working that out means asking the
  * simulation what thirty minutes would actually pay, on a copy of the state, so
  * the answer is the real one rather than an estimate that drifts from it.
@@ -20,18 +20,18 @@ import { cloneState, type GameState } from './state';
 /** Five minutes of doubled output. Long enough to feel, short enough to want again. */
 export const BLESSING_DURATION_SECONDS = 5 * 60;
 
-/** A chest pays what half an hour of the current run would have paid. */
-export const CHEST_SECONDS_OF_INCOME = 30 * 60;
+/** A cache pays what half an hour of the current stone would have paid. */
+export const CACHE_SECONDS_OF_INCOME = 30 * 60;
 
 /**
- * Gold the run would earn in `seconds`, without any of it actually happening.
+ * Dust the stone would gather in `seconds`, without any of it actually happening.
  *
- * Runs on a copy, so floors are not advanced and no state is touched. This is
+ * Runs on a copy, so stages are not advanced and no state is touched. This is
  * the honest way to price a reward: it is the same simulation the player is
  * subject to, not a parallel formula that can disagree with it.
  */
 export function previewEarnings(state: GameState, seconds: number): Decimal {
-  return advance(cloneState(state), seconds).goldEarned;
+  return advance(cloneState(state), seconds).dustGathered;
 }
 
 /**
@@ -45,13 +45,13 @@ export function grantBlessing(state: GameState): number {
   return state.blessingRemaining;
 }
 
-export function chestValue(state: GameState): Decimal {
-  return previewEarnings(state, CHEST_SECONDS_OF_INCOME);
+export function cacheValue(state: GameState): Decimal {
+  return previewEarnings(state, CACHE_SECONDS_OF_INCOME);
 }
 
-export function grantChest(state: GameState): Decimal {
-  const value = chestValue(state);
-  state.gold = state.gold.add(value);
-  state.lifetimeGold = state.lifetimeGold.add(value);
+export function grantCache(state: GameState): Decimal {
+  const value = cacheValue(state);
+  state.dust = state.dust.add(value);
+  state.lifetimeDust = state.lifetimeDust.add(value);
   return value;
 }

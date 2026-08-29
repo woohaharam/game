@@ -10,7 +10,7 @@ import type { Decimal } from '@core/decimal';
 import { t } from '@core/i18n';
 import type { SoundName } from '@platform/audio';
 import type { Purchase } from '@game/shop';
-import { canAutoDelve } from '@game/prestige';
+import { canAutoRefine } from '@game/prestige';
 import type { GameState } from '@game/state';
 import type { ShopEntry } from '../catalogue';
 import { el, setDisabled, setHidden, setText, setToggle } from '../dom';
@@ -33,7 +33,7 @@ export interface ShopPanelDeps {
   readonly wantedLevels: () => number;
   readonly sound: (name: SoundName) => void;
   /** Present only on the panel that hosts the Auto-Delve toggle. */
-  readonly onToggleAutoDelve?: (() => void) | undefined;
+  readonly onToggleAutoRefine?: (() => void) | undefined;
 }
 
 export class ShopPanel {
@@ -53,15 +53,15 @@ export class ShopPanel {
     const before: HTMLElement[] = [];
     if (header !== undefined) before.push(header);
 
-    const auto = this.buildAutoDelve();
+    const auto = this.buildAutoRefine();
     if (auto !== null) before.push(auto);
 
     this.root = el('div', { class: 'rows' }, [...before, ...rows]);
     return this.root;
   }
 
-  private buildAutoDelve(): HTMLElement | null {
-    const onToggle = this.deps.onToggleAutoDelve;
+  private buildAutoRefine(): HTMLElement | null {
+    const onToggle = this.deps.onToggleAutoRefine;
     if (onToggle === undefined) return null;
 
     this.autoButton = el('button', { class: 'auto-toggle', type: 'button' }, ['']);
@@ -69,23 +69,23 @@ export class ShopPanel {
 
     this.autoHint = el('span', { class: 'auto-hint' }, ['']);
 
-    return el('div', { class: 'auto-delve' }, [
+    return el('div', { class: 'auto-refine' }, [
       el('span', { class: 'auto-label' }, [t('shop.autoDelve')]),
       this.autoHint,
       this.autoButton,
     ]);
   }
 
-  private updateAutoDelve(state: GameState): void {
+  private updateAutoRefine(state: GameState): void {
     if (this.autoButton === null || this.autoHint === null) return;
 
-    const unlocked = canAutoDelve(state);
+    const unlocked = canAutoRefine(state);
     setDisabled(this.autoButton, !unlocked);
     setText(
       this.autoButton,
-      t(state.autoDelve && unlocked ? 'shop.autoDelveOn' : 'shop.autoDelveOff'),
+      t(state.autoRefine && unlocked ? 'shop.autoDelveOn' : 'shop.autoDelveOff'),
     );
-    setToggle(this.autoButton, 'on', unlocked && state.autoDelve);
+    setToggle(this.autoButton, 'on', unlocked && state.autoRefine);
     setText(this.autoHint, unlocked ? t('shop.autoDelveHint') : t('shop.autoDelveLocked'));
   }
 
@@ -119,7 +119,7 @@ export class ShopPanel {
 
   update(): void {
     const state = this.deps.state;
-    this.updateAutoDelve(state);
+    this.updateAutoRefine(state);
 
     for (const entry of this.entries) {
       const row = this.rows.get(entry.key);

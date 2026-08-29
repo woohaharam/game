@@ -18,8 +18,17 @@ import { COMPANIONS } from './content/companions';
 import { UPGRADES } from './content/upgrades';
 import { createInitialState, type GameState } from './state';
 
-export const SAVE_VERSION = 1;
-export const SAVE_KEY = 'deepdelve.save.v1';
+export const SAVE_VERSION = 2;
+
+/**
+ * The key is not versioned even though the payload is.
+ *
+ * A versioned key means an upgrade silently abandons the old save under its old
+ * key and starts the player from nothing, which is the failure this whole module
+ * exists to prevent. One key plus a version field inside it means `migrate` is
+ * always given the chance to bring an old save forward.
+ */
+export const SAVE_KEY = 'pebble.save';
 
 /** Anything at all; decoding treats every field as hostile. */
 type Unknown = Record<string, unknown>;
@@ -47,21 +56,20 @@ function asDecimal(value: unknown): Decimal {
 export function encode(state: GameState, now = Date.now()): string {
   const payload = {
     v: SAVE_VERSION,
-    floor: state.floor,
-    highestFloor: state.highestFloor,
-    killsOnFloor: state.killsOnFloor,
-    fightingGuardian: state.fightingGuardian,
-    guardianTimeRemaining: state.guardianTimeRemaining,
-    enemyHealthRemaining: state.enemyHealthRemaining.serialise(),
-    enemyIndex: state.enemyIndex,
-    gold: state.gold.serialise(),
-    lifetimeGold: state.lifetimeGold.serialise(),
-    relics: state.relics.serialise(),
-    lifetimeRelics: state.lifetimeRelics.serialise(),
+    stage: state.stage,
+    highestStage: state.highestStage,
+    fragmentsOnStage: state.fragmentsOnStage,
+    fragmentRemaining: state.fragmentRemaining.serialise(),
+    fragmentIndex: state.fragmentIndex,
+    mass: state.mass.serialise(),
+    dust: state.dust.serialise(),
+    lifetimeDust: state.lifetimeDust.serialise(),
+    crystals: state.crystals.serialise(),
+    lifetimeCrystals: state.lifetimeCrystals.serialise(),
     upgrades: state.upgrades,
     companions: state.companions,
     blessingRemaining: state.blessingRemaining,
-    autoDelve: state.autoDelve,
+    autoRefine: state.autoRefine,
     stats: state.stats,
     lastSeen: now,
   };
@@ -97,26 +105,23 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
   const state = fresh;
   let repaired = version !== SAVE_VERSION;
 
-  state.floor = Math.max(1, asCount(migrated.floor, 1));
-  state.highestFloor = asCount(migrated.highestFloor, 0);
-  state.killsOnFloor = asCount(migrated.killsOnFloor, 0);
-  state.fightingGuardian = migrated.fightingGuardian === true;
-  state.guardianTimeRemaining = Math.max(0, asFiniteNumber(migrated.guardianTimeRemaining, 30));
-  state.enemyIndex = asCount(migrated.enemyIndex, 0);
-  state.gold = asDecimal(migrated.gold);
-  state.lifetimeGold = asDecimal(migrated.lifetimeGold).max(state.gold);
-  state.relics = asDecimal(migrated.relics);
-  state.lifetimeRelics = asDecimal(migrated.lifetimeRelics).max(state.relics);
+  state.stage = Math.max(1, asCount(migrated.stage, 1));
+  state.highestStage = asCount(migrated.highestStage, 0);
+  state.fragmentsOnStage = asCount(migrated.fragmentsOnStage, 0);
+  state.fragmentIndex = asCount(migrated.fragmentIndex, 0);
+  state.mass = asDecimal(migrated.mass);
+  state.dust = asDecimal(migrated.dust);
+  state.lifetimeDust = asDecimal(migrated.lifetimeDust).max(state.dust);
+  state.crystals = asDecimal(migrated.crystals);
+  state.lifetimeCrystals = asDecimal(migrated.lifetimeCrystals).max(state.crystals);
   state.blessingRemaining = Math.max(0, asFiniteNumber(migrated.blessingRemaining, 0));
-  // Absent in saves written before Auto-Delve existed, which is why every field
-  // is read with a default rather than assumed present.
-  state.autoDelve = migrated.autoDelve === true;
+  state.autoRefine = migrated.autoRefine === true;
 
-  const health = asDecimal(migrated.enemyHealthRemaining);
-  // A zero here would be indistinguishable from an enemy at death's door, which
-  // would hand out a free kill on every load.
-  state.enemyHealthRemaining =
-    health.isZero || health.isNegative ? fresh.enemyHealthRemaining : health;
+  const partial = asDecimal(migrated.fragmentRemaining);
+  // A zero here would be indistinguishable from a fragment about to land, which
+  // would hand out a free absorption on every load.
+  state.fragmentRemaining =
+    partial.isZero || partial.isNegative ? fresh.fragmentRemaining : partial;
 
   const upgrades = asObject(migrated.upgrades);
   for (const upgrade of UPGRADES) {
@@ -132,10 +137,9 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
   }
 
   const stats = asObject(migrated.stats);
-  state.stats.totalKills = asCount(stats.totalKills, 0);
-  state.stats.guardiansFelled = asCount(stats.guardiansFelled, 0);
-  state.stats.guardiansEscaped = asCount(stats.guardiansEscaped, 0);
-  state.stats.descents = asCount(stats.descents, 0);
+  state.stats.totalFragments = asCount(stats.totalFragments, 0);
+  state.stats.stagesReached = asCount(stats.stagesReached, 0);
+  state.stats.compressions = asCount(stats.compressions, 0);
   state.stats.playSeconds = Math.max(0, asFiniteNumber(stats.playSeconds, 0));
 
   state.lastSeen = asFiniteNumber(migrated.lastSeen, now);
@@ -146,10 +150,10 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
     repaired = true;
   }
 
-  // The highest floor is what relics are paid against, so it can never be
-  // behind the current one — that would be a free rebate on a descent.
-  if (state.highestFloor < state.floor - 1) {
-    state.highestFloor = state.floor - 1;
+  // The highest stage is what crystals are paid against, so it can never be
+  // behind the current one — that would be a free rebate on a compression.
+  if (state.highestStage < state.stage - 1) {
+    state.highestStage = state.stage - 1;
     repaired = true;
   }
 
@@ -159,22 +163,51 @@ export function decode(text: string | null, now = Date.now()): DecodeResult {
 /**
  * Brings an older payload up to the current shape.
  *
- * Version 1 is the first published format, so there is nothing to migrate yet.
- * The sequence is here from the start because retrofitting migrations onto a
- * format that never had them means guessing what old saves looked like.
+ * Version 1 was the dungeon game this grew out of, and it shared nothing but a
+ * shape: floors instead of stages, gold instead of dust, relics instead of
+ * crystals. The names map one to one, and a player who was on floor 40 with
+ * 12,000 gold has earned being on stage 40 with 12,000 dust — so the migration
+ * renames rather than discards. Dropping the save instead would have been less
+ * code and a worse thing to do to somebody.
  */
+function migrateV1toV2(raw: Unknown): Unknown {
+  const stats = asObject(raw.stats);
+  return {
+    ...raw,
+    v: 2,
+    stage: raw.floor,
+    highestStage: raw.highestFloor,
+    fragmentsOnStage: raw.killsOnFloor,
+    fragmentRemaining: raw.enemyHealthRemaining,
+    fragmentIndex: raw.enemyIndex,
+    // Version 1 had no mass; it is derived from nothing, so the stone starts
+    // its new life weightless and grows from where the player actually is.
+    mass: undefined,
+    dust: raw.gold,
+    lifetimeDust: raw.lifetimeGold,
+    crystals: raw.relics,
+    lifetimeCrystals: raw.lifetimeRelics,
+    autoRefine: raw.autoDelve,
+    stats: {
+      totalFragments: stats.totalKills,
+      stagesReached: stats.guardiansFelled,
+      compressions: stats.descents,
+      playSeconds: stats.playSeconds,
+    },
+  };
+}
+
 function migrate(raw: Unknown, version: number): Unknown {
-  const current = raw;
+  let current = raw;
   let at = version;
 
   // Saves written before versioning (or with a mangled version field) are read
-  // on a best-effort basis at the current shape; every field is defaulted
-  // anyway, so the worst case is a partially recovered run rather than a loss.
+  // on a best-effort basis at the oldest known shape; every field is defaulted
+  // anyway, so the worst case is a partially recovered stone rather than a loss.
   if (at < 1) at = 1;
 
   while (at < SAVE_VERSION) {
-    // Each future version appends a step here, e.g.:
-    //   if (at === 1) current = migrateV1toV2(current);
+    if (at === 1) current = migrateV1toV2(current);
     at += 1;
   }
 

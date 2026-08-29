@@ -106,13 +106,13 @@ describe('string tables', () => {
 describe('lookup', () => {
   it('substitutes placeholders', () => {
     setLocale('ko');
-    expect(t('combat.floor', { n: 42 })).toBe('42층');
-    expect(t('descend.locked', { n: 10 })).toContain('10층');
+    expect(t('stone.stage', { n: 42 })).toBe('42단계');
+    expect(t('descend.locked', { n: 10 })).toContain('10단계');
   });
 
   it('leaves an unknown placeholder visible rather than printing undefined', () => {
     setLocale('en');
-    expect(t('combat.floor')).toBe('Floor {n}');
+    expect(t('stone.stage')).toBe('Stage {n}');
   });
 
   it('localises durations', () => {

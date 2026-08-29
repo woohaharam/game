@@ -1,7 +1,7 @@
 /**
  * Everything the shop can sell, behind one shape.
  *
- * Upgrades and companions are different content and identical commerce: a name,
+ * Refinements and orbiters are different content and identical commerce: a name,
  * an icon, a level, a price that follows the same geometric curve, and a rule
  * for when they appear. Describing both as `ShopEntry` is what lets a single
  * panel render either — and, more usefully, means a bug fixed in how a price is
@@ -18,15 +18,15 @@ import { formatNumber } from '@core/format';
 import { COMPANIONS, companionName } from '@game/content/companions';
 import { UPGRADES, upgradeDescription, upgradeName } from '@game/content/upgrades';
 import {
-  buyCompanion,
-  buyUpgrade,
-  isCompanionUnlocked,
-  isUpgradeMaxed,
-  isUpgradeUnlocked,
-  nextCompanionCost,
-  nextUpgradeCost,
-  quoteCompanion,
-  quoteUpgrade,
+  buyOrbiter,
+  buyRefinement,
+  isOrbiterUnlocked,
+  isRefinementMaxed,
+  isRefinementUnlocked,
+  orbiterPrice,
+  refinementPrice,
+  quoteOrbiter,
+  quoteRefinement,
   type Purchase,
 } from '@game/shop';
 import type { GameState } from '@game/state';
@@ -54,12 +54,12 @@ export function upgradeEntries(): readonly ShopEntry[] {
     name: () => upgradeName(definition.id),
     description: () => upgradeDescription(definition.id),
     level: (state) => state.upgrades[definition.id],
-    unlocked: (state) => isUpgradeUnlocked(state, definition),
-    maxed: (state) => isUpgradeMaxed(state, definition),
-    quote: (state, wanted) => quoteUpgrade(state, definition.id, wanted),
-    unitPrice: (state) => nextUpgradeCost(state, definition.id),
+    unlocked: (state) => isRefinementUnlocked(state, definition),
+    maxed: (state) => isRefinementMaxed(state, definition),
+    quote: (state, wanted) => quoteRefinement(state, definition.id, wanted),
+    unitPrice: (state) => refinementPrice(state, definition.id),
     buy: (state, wanted) => {
-      buyUpgrade(state, definition.id, wanted);
+      buyRefinement(state, definition.id, wanted);
     },
   }));
 }
@@ -71,14 +71,14 @@ export function companionEntries(): readonly ShopEntry[] {
     name: () => companionName(definition.id),
     description: () => t('party.damage', { amount: formatNumber(definition.damagePerLevel) }),
     level: (state) => state.companions[definition.id],
-    unlocked: (state) => isCompanionUnlocked(state, definition),
-    // Companions have no ceiling: they are the sink for a bank that has
-    // outgrown every upgrade cap.
+    unlocked: (state) => isOrbiterUnlocked(state, definition),
+    // Orbiters have no ceiling: they are the sink for a bank that has
+    // outgrown every refinement cap.
     maxed: () => false,
-    quote: (state, wanted) => quoteCompanion(state, definition.id, wanted),
-    unitPrice: (state) => nextCompanionCost(state, definition.id),
+    quote: (state, wanted) => quoteOrbiter(state, definition.id, wanted),
+    unitPrice: (state) => orbiterPrice(state, definition.id),
     buy: (state, wanted) => {
-      buyCompanion(state, definition.id, wanted);
+      buyOrbiter(state, definition.id, wanted);
     },
   }));
 }

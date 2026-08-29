@@ -11,7 +11,7 @@
  * silently put the interface back into a language the player does not read.
  */
 
-import { formatDuration, type Notation } from './format';
+import { formatDuration, formatMass, type MassUnit, type Notation } from './format';
 import { en, type StringKey } from './strings/en';
 import { ko } from './strings/ko';
 
@@ -99,6 +99,32 @@ export function duration(seconds: number): string {
     minute: t('duration.minute'),
     second: t('duration.second'),
   });
+}
+
+/**
+ * Mass units in ascending order, with the current locale's labels.
+ *
+ * Earth and solar masses are the real figures (5.97e27 g and 1.99e33 g), which
+ * is the point: once the stone passes a planet the number stops being arbitrary
+ * and starts being a comparison the player already has a feeling for.
+ */
+function massUnits(): readonly MassUnit[] {
+  return [
+    { exponent: 0, label: t('mass.gram') },
+    { exponent: 3, label: t('mass.kilogram') },
+    { exponent: 6, label: t('mass.tonne') },
+    { exponent: 9, label: t('mass.kilotonne') },
+    { exponent: 12, label: t('mass.megatonne') },
+    { exponent: 15, label: t('mass.gigatonne') },
+    { exponent: 27, label: t('mass.earth') },
+    { exponent: 33, label: t('mass.sun') },
+    { exponent: 45, label: t('mass.galaxy') },
+  ];
+}
+
+/** `formatMass` with the current locale's unit labels. */
+export function mass(grams: Parameters<typeof formatMass>[0], notation: Notation): string {
+  return formatMass(grams, massUnits(), { notation });
 }
 
 /**

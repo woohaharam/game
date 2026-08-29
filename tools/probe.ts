@@ -2,12 +2,12 @@
  * The balance probe.
  *
  * Answers the only question that matters about the curves — "does a real player
- * keep getting deeper, and how fast?" — by running the actual simulation
+ * keep getting further, and how fast?" — by running the actual simulation
  * against a simulated player, rather than by reasoning about the exponents.
  *
  * That distinction earned its keep. The relic growth rate was first derived
  * analytically, tuned to a number that looked right, and measured only
- * afterwards: the measurement showed the runs converging on a fixed depth and
+ * afterwards: the measurement showed the stones converging on a fixed stage and
  * quietly ending the game. The derivation had been correct about the shape and
  * wrong about which quantity it applied to.
  *
@@ -19,7 +19,12 @@ import { writeFileSync } from 'node:fs';
 import { autoplay } from '../src/game/autoplay';
 import { formatDuration, formatNumber } from '../src/core/format';
 import { setLocale } from '../src/core/i18n';
-import { canDescend, descend, pendingRelics, DESCENT_UNLOCK_FLOOR } from '../src/game/prestige';
+import {
+  canCompress,
+  compress,
+  pendingCrystals,
+  COMPRESSION_UNLOCK_STAGE,
+} from '../src/game/prestige';
 import { computeStats } from '../src/game/stats';
 import { createInitialState, type GameState } from '../src/game/state';
 
@@ -31,62 +36,62 @@ const PATIENCE = 8;
 
 const DESCENTS = 20;
 
-interface RunRow {
+interface StoneRow {
   readonly run: number;
   readonly elapsedSeconds: number;
-  readonly depth: number;
+  readonly stage: number;
   readonly gain: number;
-  readonly relics: string;
+  readonly crystals: string;
   readonly multiplier: string;
-  readonly damagePerSecond: string;
+  readonly absorption: string;
 }
 
-/** Plays one run to its wall and reports where that was. */
-function playToWall(state: GameState): void {
+/** Grows one stone to its wall and reports where that was. */
+function growToWall(state: GameState): void {
   let previous = -1;
   let stagnant = 0;
 
   while (stagnant < PATIENCE) {
     autoplay(state, SESSION_SECONDS);
-    if (state.highestFloor === previous) stagnant += 1;
+    if (state.highestStage === previous) stagnant += 1;
     else stagnant = 0;
-    previous = state.highestFloor;
+    previous = state.highestStage;
   }
 }
 
-function measure(): RunRow[] {
+function measure(): StoneRow[] {
   const state = createInitialState(0);
-  const rows: RunRow[] = [];
+  const rows: StoneRow[] = [];
   let elapsed = 0;
-  let previousDepth = 0;
+  let previousStage = 0;
 
   for (let run = 1; run <= DESCENTS; run += 1) {
     const before = state.stats.playSeconds;
-    playToWall(state);
+    growToWall(state);
     elapsed += state.stats.playSeconds - before;
 
-    const gained = pendingRelics(state.highestFloor);
+    const gained = pendingCrystals(state.highestStage);
     const stats = computeStats(state);
 
     rows.push({
       run,
       elapsedSeconds: elapsed,
-      depth: state.highestFloor,
-      gain: state.highestFloor - previousDepth,
-      relics: formatNumber(state.relics.add(gained)),
-      multiplier: formatNumber(stats.relicMultiplier),
-      damagePerSecond: formatNumber(stats.damagePerSecond),
+      stage: state.highestStage,
+      gain: state.highestStage - previousStage,
+      crystals: formatNumber(state.crystals.add(gained)),
+      multiplier: formatNumber(stats.crystalMultiplier),
+      absorption: formatNumber(stats.absorptionPerSecond),
     });
 
-    previousDepth = state.highestFloor;
-    if (!canDescend(state)) break;
-    descend(state, 0);
+    previousStage = state.highestStage;
+    if (!canCompress(state)) break;
+    compress(state, 0);
   }
 
   return rows;
 }
 
-function toMarkdown(rows: RunRow[]): string {
+function toMarkdown(rows: StoneRow[]): string {
   const first = rows[0];
   const last = rows[rows.length - 1];
   if (first === undefined || last === undefined) throw new Error('no rows measured');
@@ -98,26 +103,26 @@ function toMarkdown(rows: RunRow[]): string {
     '',
     'Measured by running the shipping simulation against the simulated player in',
     '`src/game/autoplay.ts`, which buys the cheapest thing it can afford every ten',
-    'seconds and descends once a run stops producing new floors. That shopper is',
+    'seconds and compresss once a run stops producing new floors. That shopper is',
     'deliberately naive, so every number here is a **lower bound**: a thoughtful',
     'player does better.',
     '',
     '## What this has to show',
     '',
-    'Reachable depth goes as `log(multiplier) / log(healthGrowth)`, and the relic',
-    'multiplier goes as `relicGrowth^depth`, so one descent maps to the next',
+    'Reachable stage goes as `log(multiplier) / log(healthGrowth)`, and the crystal',
+    'multiplier goes as `crystalGrowth^depth`, so one descent maps to the next',
     'roughly linearly. If the gain per descent shrinks toward zero, the runs have a',
-    'fixed point: the player descends forever and never moves, and the game ends',
+    'fixed point: the player compresss forever and never moves, and the game ends',
     'without ever saying so. The gain column is the check.',
     '',
-    '| Run | Wall clock | Depth | Gain | Relics | Multiplier | Damage/sec |',
+    '| Stone | Wall clock | Stage | Gain | Crystals | Multiplier | Absorption/sec |',
     '| --: | ---------: | ----: | ---: | -----: | ---------: | ---------: |',
   ];
 
   for (const row of rows) {
     lines.push(
-      `| ${row.run} | ${formatDuration(row.elapsedSeconds)} | ${row.depth} | ` +
-        `+${row.gain} | ${row.relics} | ×${row.multiplier} | ${row.damagePerSecond} |`,
+      `| ${row.run} | ${formatDuration(row.elapsedSeconds)} | ${row.stage} | ` +
+        `+${row.gain} | ${row.crystals} | ×${row.multiplier} | ${row.absorption} |`,
     );
   }
 
@@ -126,15 +131,15 @@ function toMarkdown(rows: RunRow[]): string {
     '',
     '## Reading it',
     '',
-    `- The first run walls at floor ${String(first.depth)}, which is where the descent`,
-    `  unlock sits (floor ${String(DESCENT_UNLOCK_FLOOR)}). A player meets the mechanic the`,
-    '  rest of the game is built around inside their first session, rather than',
-    '  grinding against a ceiling with it still greyed out.',
+    `- The first stone walls at stage ${String(first.stage)}, which is past where the`,
+    `  compression unlock sits (stage ${String(COMPRESSION_UNLOCK_STAGE)}). A player meets the mechanic the`,
+    '  the rest of the game is built around inside their first session, rather',
+    '  than grinding against a ceiling with it still greyed out.',
     early === undefined
       ? ''
-      : `- Gains climb rather than shrink: +${String(early.gain)} floors by run ${String(early.run)}, ` +
-          `+${String(last.gain)} by run ${String(last.run)}.`,
-    '- No plateau appears across the measured descents, which is what says the',
+      : `- Gains climb rather than shrink: +${String(early.gain)} stages by stone ${String(early.run)}, ` +
+          `+${String(last.gain)} by stone ${String(last.run)}.`,
+    '- No plateau appears across the measured compressions, which is what says the',
     '  relic growth rate sits above the health growth rate rather than below it.',
     '',
   );
@@ -142,17 +147,17 @@ function toMarkdown(rows: RunRow[]): string {
   return lines.filter((line) => line !== '').join('\n') + '\n';
 }
 
-function toTable(rows: RunRow[]): string {
-  const header = 'run  wall clock   depth  gain  relics       multiplier   damage/sec';
+function toTable(rows: StoneRow[]): string {
+  const header = 'stone  wall clock   stage  gain  crystals     multiplier   absorb/sec';
   const body = rows.map((row) =>
     [
       String(row.run).padStart(3),
       formatDuration(row.elapsedSeconds).padStart(11),
-      String(row.depth).padStart(6),
+      String(row.stage).padStart(6),
       `+${String(row.gain)}`.padStart(5),
-      row.relics.padStart(12),
+      row.crystals.padStart(12),
       `×${row.multiplier}`.padStart(12),
-      row.damagePerSecond.padStart(12),
+      row.absorption.padStart(12),
     ].join(' '),
   );
   return [header, ...body].join('\n');

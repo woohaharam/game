@@ -51,11 +51,11 @@ export function applyOfflineProgress(state: GameState, now = Date.now()): Offlin
   const heldBlessing = state.blessingRemaining;
   state.blessingRemaining = 0;
 
-  // With Auto-Delve on, the hero shops while away, which is the whole reason
-  // the unlock is worth having: gold that is never spent stops buying floors.
+  // With auto-refine on, the stone shops while away, which is the whole reason
+  // the unlock is worth having: dust that is never spent stops buying stages.
   // It runs the same interleave the live loop does, at the same interval, so
   // eight hours away still lands where eight hours watched would have.
-  const report = state.autoDelve
+  const report = state.autoRefine
     ? autoplay(state, creditedSeconds).report
     : advance(state, creditedSeconds);
 
@@ -69,18 +69,18 @@ export function applyOfflineProgress(state: GameState, now = Date.now()): Offlin
     report,
     worthReporting:
       elapsedSeconds >= OFFLINE_REPORT_THRESHOLD_SECONDS &&
-      (report.kills > 0 || !report.goldEarned.isZero),
+      (report.fragments > 0 || !report.dustGathered.isZero),
   };
 }
 
 /**
  * Pays a second helping of an offline haul, for a watched advertisement.
  *
- * This grants the gold directly rather than re-simulating: the floors were
- * already climbed, and running the simulation twice would advance the run a
- * second time for a reward that was only ever about the gold.
+ * This grants the gold directly rather than re-simulating: the stages were
+ * already grown through, and running the simulation twice would advance the
+ * stone a second time for a reward that was only ever about the dust.
  */
 export function doubleOfflineEarnings(state: GameState, result: OfflineResult): void {
-  state.gold = state.gold.add(result.report.goldEarned);
-  state.lifetimeGold = state.lifetimeGold.add(result.report.goldEarned);
+  state.dust = state.dust.add(result.report.dustGathered);
+  state.lifetimeDust = state.lifetimeDust.add(result.report.dustGathered);
 }

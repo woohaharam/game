@@ -15,21 +15,21 @@
 
 import { advance, emptyReport, mergeReports, type AdvanceReport } from './simulation';
 import { spendGreedily } from './shop';
-import { canDescend, descend } from './prestige';
+import { canCompress, compress } from './prestige';
 import type { GameState } from './state';
 
 export interface AutoplayOptions {
   /** How often the simulated player checks the shop. */
   readonly shopIntervalSeconds?: number;
-  /** Descend automatically once the run reaches this depth. Off when absent. */
-  readonly descendAtFloor?: number;
+  /** Compress automatically once the stone reaches this stage. Off when absent. */
+  readonly descendAtStage?: number;
 }
 
 export interface AutoplayResult {
   readonly secondsPlayed: number;
   readonly purchases: number;
-  readonly descents: number;
-  readonly highestFloor: number;
+  readonly compressions: number;
+  readonly highestStage: number;
   /** Everything the underlying simulation did, summed across the slices. */
   readonly report: AdvanceReport;
 }
@@ -43,12 +43,12 @@ export function autoplay(
   // shop. Checking every frame would make the simulated player superhuman and
   // the resulting curves too optimistic to trust.
   const interval = Math.max(0.1, options.shopIntervalSeconds ?? 10);
-  const descendAt = options.descendAtFloor;
+  const compressAt = options.descendAtStage;
 
   let played = 0;
   let purchases = 0;
-  let descents = 0;
-  let deepest = state.highestFloor;
+  let compressions = 0;
+  let deepest = state.highestStage;
   let report = emptyReport(state);
 
   while (played < seconds) {
@@ -57,13 +57,13 @@ export function autoplay(
     played += step;
 
     purchases += spendGreedily(state);
-    deepest = Math.max(deepest, state.highestFloor);
+    deepest = Math.max(deepest, state.highestStage);
 
-    if (descendAt !== undefined && state.highestFloor >= descendAt && canDescend(state)) {
-      descend(state);
-      descents += 1;
+    if (compressAt !== undefined && state.highestStage >= compressAt && canCompress(state)) {
+      compress(state);
+      compressions += 1;
     }
   }
 
-  return { secondsPlayed: played, purchases, descents, highestFloor: deepest, report };
+  return { secondsPlayed: played, purchases, compressions, highestStage: deepest, report };
 }

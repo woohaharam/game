@@ -41,8 +41,8 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
-import { canAutoDelve, canDescend, descend } from '@game/prestige';
-import { grantBlessing, grantChest } from '@game/rewards';
+import { canAutoRefine, canCompress, compress } from '@game/prestige';
+import { grantBlessing, grantCache } from '@game/rewards';
 import { decode, encode, load, save, wipe } from '@game/save';
 import { fromTransferCode, toTransferCode } from '@game/transfer';
 import { advance } from '@game/simulation';
@@ -50,17 +50,16 @@ import { spendGreedily } from '@game/shop';
 import { GameAudio } from '@platform/audio';
 import { detectAdProvider } from '@platform/portals';
 import { GameView } from '@ui/view';
-import type { FrameFeedback } from '@ui/panels/combat';
+import type { FrameFeedback } from '@ui/panels/stone';
 import { Decimal } from '@core/decimal';
 
-function emptyFeedback(floor: number): FrameFeedback {
+function emptyFeedback(stage: number): FrameFeedback {
   return {
-    damage: Decimal.ZERO,
-    gold: Decimal.ZERO,
-    kills: 0,
-    guardiansFelled: 0,
-    floorsCleared: 0,
-    floor,
+    massGained: Decimal.ZERO,
+    dust: Decimal.ZERO,
+    fragments: 0,
+    stagesGained: 0,
+    stage,
   };
 }
 
@@ -81,14 +80,14 @@ const AUTOSAVE_INTERVAL_MS = 10_000;
 const RENDER_INTERVAL_MS = 1000 / 20;
 
 /**
- * How often Auto-Delve visits the shop, in simulated seconds.
+ * How often auto-refine visits the shop, in simulated seconds.
  *
  * Deliberately the same figure the offline catch-up uses, so a player who
  * leaves the tab open and one who closes it end up in the same place. Checking
  * every frame would make the automaton superhuman relative to the balance
  * measurements, which assume this interval.
  */
-const AUTO_DELVE_INTERVAL_SECONDS = 10;
+const AUTO_REFINE_INTERVAL_SECONDS = 10;
 
 function boot(): void {
   const found = document.querySelector<HTMLElement>('#app');
@@ -103,7 +102,7 @@ function boot(): void {
 
   // Sound defaults on, which is what a portal player expects; the choice is
   // remembered separately from the save, like the other preferences.
-  const audio = new GameAudio(store.read('deepdelve.sound') !== 'off');
+  const audio = new GameAudio(store.read('pebble.sound') !== 'off');
 
   let paused = false;
   const provider = detectAdProvider(globalThis, {
@@ -127,8 +126,8 @@ function boot(): void {
 
   // Preferences live outside the save: erasing a run should not drop the player
   // back into a language they cannot read.
-  const NOTATION_KEY = 'deepdelve.notation';
-  const SOUND_KEY = 'deepdelve.sound';
+  const NOTATION_KEY = 'pebble.notation';
+
   const locale = detectLocale({
     stored: store.read(LOCALE_STORAGE_KEY),
     search: globalThis.location.search,
@@ -148,13 +147,13 @@ function boot(): void {
     sound: (name: Parameters<typeof audio.play>[0]) => audio.play(name),
     onToggleSound: () => {
       audio.setEnabled(!audio.isEnabled());
-      store.write(SOUND_KEY, audio.isEnabled() ? 'on' : 'off');
+      store.write('pebble.sound', audio.isEnabled() ? 'on' : 'off');
       if (audio.isEnabled()) audio.unlock();
     },
     isSoundOn: () => audio.isEnabled(),
-    onToggleAutoDelve: () => {
-      if (!canAutoDelve(state)) return;
-      state.autoDelve = !state.autoDelve;
+    onToggleAutoRefine: () => {
+      if (!canAutoRefine(state)) return;
+      state.autoRefine = !state.autoRefine;
       save(store, state);
     },
     onExportSave: () => {
@@ -191,16 +190,16 @@ function boot(): void {
       globalThis.alert(t('settings.importOk'));
       globalThis.location.reload();
     },
-    onDescend: () => {
-      if (!canDescend(state)) return;
+    onCompress: () => {
+      if (!canCompress(state)) return;
       const confirmed = globalThis.confirm(t('descend.confirm'));
       if (!confirmed) return;
 
-      const result = descend(state);
+      const result = compress(state);
       audio.play('descend');
-      view.announce(t('effect.descended', { relics: formatNumber(result.relicsGained) }));
+      view.announce(t('effect.compressed', { crystals: formatNumber(result.crystalsGained) }));
       save(store, state);
-      // A descent is the natural break in the session: the run just ended, and
+      // A compression is the natural break in the session: the stone just ended, and
       // nothing is interrupted. It is the only place an interstitial belongs.
       void provider.showInterstitial();
     },
@@ -211,10 +210,10 @@ function boot(): void {
         audio.play('reward');
       });
     },
-    onWatchForChest: () => {
+    onWatchForCache: () => {
       void provider.showRewarded('chest').then((outcome) => {
         if (!outcome.granted) return;
-        grantChest(state);
+        grantCache(state);
         audio.play('reward');
       });
     },
@@ -283,9 +282,9 @@ function boot(): void {
     pendingOffline = result;
     view.showOffline({
       awaySeconds: result.elapsedSeconds,
-      gold: result.report.goldEarned,
-      kills: result.report.kills,
-      floors: Math.max(0, result.report.endFloor - result.report.startFloor),
+      gold: result.report.dustGathered,
+      kills: result.report.fragments,
+      floors: Math.max(0, result.report.endStage - result.report.startStage),
       cappedOut: result.cappedOut,
       canDouble: provider.rewardedAvailable(),
     });
@@ -306,8 +305,8 @@ function boot(): void {
    * Accumulating rather than sampling means a kill that happened between
    * repaints still produces a number, instead of being silently dropped.
    */
-  let pending: FrameFeedback = emptyFeedback(state.floor);
-  let sinceAutoDelve = 0;
+  let pending: FrameFeedback = emptyFeedback(state.stage);
+  let sinceAutoRefine = 0;
 
   function frame(now: number): void {
     requestAnimationFrame(frame);
@@ -321,21 +320,20 @@ function boot(): void {
       if (delta > 0 && delta <= MAX_FRAME_SECONDS) {
         const report = advance(state, delta);
 
-        if (state.autoDelve && canAutoDelve(state)) {
-          sinceAutoDelve += delta;
-          if (sinceAutoDelve >= AUTO_DELVE_INTERVAL_SECONDS) {
-            sinceAutoDelve = 0;
+        if (state.autoRefine && canAutoRefine(state)) {
+          sinceAutoRefine += delta;
+          if (sinceAutoRefine >= AUTO_REFINE_INTERVAL_SECONDS) {
+            sinceAutoRefine = 0;
             if (spendGreedily(state) > 0) audio.play('purchase');
           }
         }
 
         pending = {
-          damage: pending.damage.add(report.damageDealt),
-          gold: pending.gold.add(report.goldEarned),
-          kills: pending.kills + report.kills,
-          guardiansFelled: pending.guardiansFelled + report.guardiansFelled,
-          floorsCleared: pending.floorsCleared + (report.endFloor - report.startFloor),
-          floor: state.floor,
+          massGained: pending.massGained.add(report.massGained),
+          dust: pending.dust.add(report.dustGathered),
+          fragments: pending.fragments + report.fragments,
+          stagesGained: pending.stagesGained + report.stagesGained,
+          stage: state.stage,
         };
       }
     }
@@ -343,7 +341,7 @@ function boot(): void {
     if (now - lastRenderAt >= RENDER_INTERVAL_MS) {
       lastRenderAt = now;
       view.applyFeedback(pending);
-      pending = emptyFeedback(state.floor);
+      pending = emptyFeedback(state.stage);
       view.update();
     }
 

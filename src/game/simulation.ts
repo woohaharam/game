@@ -11,41 +11,33 @@
  *
  * Making one function serve both requires it to be O(events) rather than
  * O(ticks). Eight hours at sixty ticks a second is 1.7 million iterations; eight
- * hours of *events* is a few thousand at most, because kills that happen at a
+ * hours of *events* is a few thousand at most, because fragments absorbed at a
  * constant rate can be counted with a division instead of a loop.
  *
- * Randomness is deliberately absent. Criticals are folded into DPS as an
- * expectation (see `computeStats`), so eight hours away pays exactly what eight
- * hours watching would have. A dice roll here would make the two disagree by
- * variance alone, and players would — correctly — call it cheating.
+ * Randomness is deliberately absent. Resonant pulls are folded into the
+ * absorption rate as an expectation (see `computeStats`), so eight hours away
+ * pays exactly what eight hours watching would have. A dice roll here would make
+ * the two disagree by variance alone, and players would — correctly — call it
+ * cheating.
  */
 
 import { Decimal } from '@core/decimal';
 import {
-  KILLS_PER_FLOOR,
-  MIN_KILL_TIME,
-  guardianGold,
-  guardianHealth,
-  monsterGold,
-  monsterHealth,
-} from './content/floors';
+  FRAGMENTS_PER_STAGE,
+  MIN_ABSORB_TIME,
+  fragmentDust,
+  fragmentMass,
+} from './content/stages';
 import { computeStats } from './stats';
-import {
-  type GameState,
-  descendOneFloor,
-  retreatToFloorStart,
-  spawnGuardian,
-  spawnMonster,
-} from './state';
+import { type GameState, growToNextStage, spawnFragment } from './state';
 
 /**
  * Ceiling on loop iterations within a single call.
  *
- * Every iteration consumes time or resolves an enemy, so this cannot be reached
- * by normal play — a walled hero costs about three iterations per 30-second
- * guardian cycle, so eight offline hours is roughly 2,800. It exists so that a
- * pathological state (a save edited to zero DPS on a zero-health floor) stalls
- * one frame instead of hanging the tab.
+ * Every iteration consumes time or resolves a fragment, so this cannot be
+ * reached by normal play. It exists so that a pathological state (a save edited
+ * to zero absorption on a zero-mass stage) stalls one frame instead of hanging
+ * the tab.
  */
 const MAX_EVENTS = 100_000;
 
@@ -55,118 +47,114 @@ const TIME_EPSILON = 1e-9;
 export interface AdvanceReport {
   /** Simulated seconds actually consumed. */
   readonly seconds: number;
-  readonly goldEarned: Decimal;
+  readonly dustGathered: Decimal;
   /**
-   * Health removed over the call.
+   * Mass drawn into the stone over the call.
    *
-   * Reported rather than left for the view to re-derive from DPS × time,
-   * because those two disagree: the kill-rate cap means a hero far beyond the
-   * floor deals less than their damage per second suggests. A floating number
-   * that says otherwise is a lie the player can check against the health bar.
+   * Reported rather than left for the view to re-derive from rate × time,
+   * because those two disagree: the absorption cap means a stone far beyond its
+   * stage draws less than its rate suggests. A floating number that says
+   * otherwise is a lie the player can check against the bar.
    */
-  readonly damageDealt: Decimal;
-  readonly kills: number;
-  readonly guardiansFelled: number;
-  readonly guardiansEscaped: number;
-  readonly startFloor: number;
-  readonly endFloor: number;
+  readonly massGained: Decimal;
+  readonly fragments: number;
+  readonly stagesGained: number;
+  readonly startStage: number;
+  readonly endStage: number;
   /** True when the loop hit its iteration ceiling, which should never happen. */
   readonly truncated: boolean;
+}
+
+export function emptyReport(state: GameState): AdvanceReport {
+  return {
+    seconds: 0,
+    dustGathered: Decimal.ZERO,
+    massGained: Decimal.ZERO,
+    fragments: 0,
+    stagesGained: 0,
+    startStage: state.stage,
+    endStage: state.stage,
+    truncated: false,
+  };
 }
 
 /**
  * Sums two consecutive reports into one.
  *
  * Used where the simulation is run in slices — the offline catch-up interleaves
- * it with shopping — so the caller still sees a single account of what happened
+ * it with refining — so the caller still sees a single account of what happened
  * rather than a list to add up itself.
  */
 export function mergeReports(first: AdvanceReport, second: AdvanceReport): AdvanceReport {
   return {
     seconds: first.seconds + second.seconds,
-    goldEarned: first.goldEarned.add(second.goldEarned),
-    damageDealt: first.damageDealt.add(second.damageDealt),
-    kills: first.kills + second.kills,
-    guardiansFelled: first.guardiansFelled + second.guardiansFelled,
-    guardiansEscaped: first.guardiansEscaped + second.guardiansEscaped,
-    startFloor: first.startFloor,
-    endFloor: second.endFloor,
+    dustGathered: first.dustGathered.add(second.dustGathered),
+    massGained: first.massGained.add(second.massGained),
+    fragments: first.fragments + second.fragments,
+    stagesGained: first.stagesGained + second.stagesGained,
+    startStage: first.startStage,
+    endStage: second.endStage,
     truncated: first.truncated || second.truncated,
   };
 }
 
-export function emptyReport(state: GameState): AdvanceReport {
-  return {
-    seconds: 0,
-    goldEarned: Decimal.ZERO,
-    damageDealt: Decimal.ZERO,
-    kills: 0,
-    guardiansFelled: 0,
-    guardiansEscaped: 0,
-    startFloor: state.floor,
-    endFloor: state.floor,
-    truncated: false,
-  };
+/**
+ * The rate the stone actually absorbs at, given a cap of one fragment per
+ * `MIN_ABSORB_TIME`.
+ *
+ * The cap has to be expressed as an absorption rate, not as a minimum
+ * absorption duration. Clamping the duration instead looks equivalent and is
+ * not: a stone that swallows a fragment within a single 16ms frame would have
+ * the absorption refused by the clamp *and* the leftover time discarded, and it
+ * would never resolve. Capping the rate keeps the remainder strictly linear in
+ * time, so a fragment lands at the same simulated moment whether it is reached
+ * in one step of an hour or in 216,000 steps of a frame.
+ */
+function effectiveAbsorptionRate(ratePerSecond: Decimal, wholeFragment: Decimal): Decimal {
+  const cap = wholeFragment.multiply(Decimal.of(1 / MIN_ABSORB_TIME, 0));
+  return ratePerSecond.min(cap);
 }
 
 /**
- * The rate the hero actually kills at, given a cap of one kill per
- * `MIN_KILL_TIME`.
+ * Seconds to absorb `remainingMass` at `rate`.
  *
- * The cap has to be expressed as a damage rate, not as a minimum kill duration.
- * Clamping the duration instead looks equivalent and is not: a hero who
- * overkills a monster within a single 16ms frame would have the kill refused by
- * the clamp *and* the leftover time discarded, and the fight would never
- * resolve. Capping the rate keeps health strictly linear in time, so a kill
- * lands at the same simulated moment whether it is reached in one step of an
- * hour or in 216,000 steps of a frame.
+ * Returns Infinity for a stone that cannot draw anything, which the caller
+ * treats as "this never finishes" rather than dividing by zero, and zero for a
+ * fragment already fully drawn, so an overshoot resolves on the next step.
  */
-function effectiveDamageRate(damagePerSecond: Decimal, enemyMaxHealth: Decimal): Decimal {
-  const cap = enemyMaxHealth.multiply(Decimal.of(1 / MIN_KILL_TIME, 0));
-  return damagePerSecond.min(cap);
-}
-
-/**
- * Seconds to remove `health` at `rate`.
- *
- * Returns Infinity for a hero who cannot damage anything, which the callers
- * treat as "this never finishes" rather than dividing by zero, and zero for an
- * enemy already at zero health, so an overkill resolves on the next step.
- */
-function timeToKill(health: Decimal, rate: Decimal): number {
+function timeToAbsorb(remainingMass: Decimal, rate: Decimal): number {
   if (rate.isZero || rate.isNegative) return Number.POSITIVE_INFINITY;
-  if (health.isZero || health.isNegative) return 0;
-  const seconds = health.divide(rate).toNumber();
+  if (remainingMass.isZero || remainingMass.isNegative) return 0;
+  const seconds = remainingMass.divide(rate).toNumber();
   if (!Number.isFinite(seconds)) return Number.POSITIVE_INFINITY;
   return seconds;
 }
 
-/** Applies damage and returns how much actually landed, after the zero clamp. */
-function applyDamageOverTime(state: GameState, rate: Decimal, seconds: number): Decimal {
-  const before = state.enemyHealthRemaining;
-  const dealt = rate.multiply(Decimal.of(seconds, 0));
-  state.enemyHealthRemaining = before.subtract(dealt).max(Decimal.ZERO);
-  return before.subtract(state.enemyHealthRemaining);
+/** Draws mass for `seconds` and returns how much actually landed. */
+function drawOverTime(state: GameState, rate: Decimal, seconds: number): Decimal {
+  const before = state.fragmentRemaining;
+  const drawn = rate.multiply(Decimal.of(seconds, 0));
+  state.fragmentRemaining = before.subtract(drawn).max(Decimal.ZERO);
+  return before.subtract(state.fragmentRemaining);
 }
 
 export function advance(state: GameState, seconds: number): AdvanceReport {
   if (!Number.isFinite(seconds) || seconds <= 0) return emptyReport(state);
 
-  const startFloor = state.floor;
+  const startStage = state.stage;
   const stats = computeStats(state);
-  const dps = stats.damagePerSecond;
+  const absorption = stats.absorptionPerSecond;
 
   let remaining = seconds;
-  let goldEarned = Decimal.ZERO;
-  let damageDealt = Decimal.ZERO;
-  let kills = 0;
-  let guardiansFelled = 0;
-  let guardiansEscaped = 0;
+  let dustGathered = Decimal.ZERO;
+  let massGained = Decimal.ZERO;
+  let fragments = 0;
+  let stagesGained = 0;
   let events = 0;
 
   const award = (amount: Decimal, count: number): void => {
-    goldEarned = goldEarned.add(
-      amount.multiply(stats.goldMultiplier).multiply(Decimal.of(count, 0)),
+    dustGathered = dustGathered.add(
+      amount.multiply(stats.dustMultiplier).multiply(Decimal.of(count, 0)),
     );
   };
 
@@ -174,86 +162,62 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
     if (events >= MAX_EVENTS) break;
     events += 1;
 
-    if (state.fightingGuardian) {
-      const rate = effectiveDamageRate(dps, guardianHealth(state.floor));
-      const killTime = timeToKill(state.enemyHealthRemaining, rate);
-      const window = Math.min(remaining, state.guardianTimeRemaining);
+    const whole = fragmentMass(state.stage);
+    const rate = effectiveAbsorptionRate(absorption, whole);
 
-      if (killTime <= window) {
-        remaining -= killTime;
-        damageDealt = damageDealt.add(state.enemyHealthRemaining);
-        award(guardianGold(state.floor), 1);
-        guardiansFelled += 1;
-        kills += 1;
-        state.stats.guardiansFelled += 1;
-        state.stats.totalKills += 1;
-        descendOneFloor(state);
-        continue;
-      }
-
-      if (state.guardianTimeRemaining <= remaining) {
-        // The timer runs out first. The hero is pushed back to the start of the
-        // floor and has to clear the trash again before another attempt.
-        remaining -= state.guardianTimeRemaining;
-        guardiansEscaped += 1;
-        state.stats.guardiansEscaped += 1;
-        retreatToFloorStart(state);
-        continue;
-      }
-
-      // The caller's budget expires mid-fight; carry the partial state forward.
-      damageDealt = damageDealt.add(applyDamageOverTime(state, rate, remaining));
-      state.guardianTimeRemaining -= remaining;
+    // Resolve the fragment already being drawn first, since it may be partly
+    // absorbed, then batch the rest of the stage in one step.
+    const firstTime = timeToAbsorb(state.fragmentRemaining, rate);
+    if (firstTime > remaining) {
+      massGained = massGained.add(drawOverTime(state, rate, remaining));
       remaining = 0;
       continue;
     }
 
-    // Trash. Resolve the monster already in front of the hero first, since it
-    // may be partly damaged, then batch the rest of the floor in one step.
-    const trashRate = effectiveDamageRate(dps, monsterHealth(state.floor));
-    const firstKillTime = timeToKill(state.enemyHealthRemaining, trashRate);
-    if (firstKillTime > remaining) {
-      damageDealt = damageDealt.add(applyDamageOverTime(state, trashRate, remaining));
-      remaining = 0;
+    remaining -= firstTime;
+    massGained = massGained.add(state.fragmentRemaining);
+    fragments += 1;
+    state.stats.totalFragments += 1;
+    state.fragmentsOnStage += 1;
+    award(fragmentDust(state.stage), 1);
+
+    if (state.fragmentsOnStage >= FRAGMENTS_PER_STAGE) {
+      growToNextStage(state);
+      stagesGained += 1;
+      state.stats.stagesReached += 1;
       continue;
     }
 
-    remaining -= firstKillTime;
-    damageDealt = damageDealt.add(state.enemyHealthRemaining);
-    kills += 1;
-    state.stats.totalKills += 1;
-    state.killsOnFloor += 1;
-    award(monsterGold(state.floor), 1);
-
-    if (state.killsOnFloor >= KILLS_PER_FLOOR) {
-      spawnGuardian(state);
-      continue;
-    }
-
-    // The remaining monsters on this floor are identical and undamaged, so how
+    // The remaining fragments on this stage are identical and untouched, so how
     // many of them fit in the budget is a division rather than a loop. This is
     // what keeps an eight-hour catch-up as cheap as a single frame.
-    const perKill = timeToKill(monsterHealth(state.floor), trashRate);
-    const outstanding = KILLS_PER_FLOOR - state.killsOnFloor;
-    const affordable = Number.isFinite(perKill) ? Math.floor(remaining / perKill) : 0;
+    const perFragment = timeToAbsorb(whole, rate);
+    const outstanding = FRAGMENTS_PER_STAGE - state.fragmentsOnStage;
+    const affordable = Number.isFinite(perFragment) ? Math.floor(remaining / perFragment) : 0;
     const batch = Math.max(0, Math.min(outstanding, affordable));
 
     if (batch > 0) {
-      remaining -= batch * perKill;
-      damageDealt = damageDealt.add(monsterHealth(state.floor).multiply(Decimal.of(batch, 0)));
-      kills += batch;
-      state.stats.totalKills += batch;
-      state.killsOnFloor += batch;
-      award(monsterGold(state.floor), batch);
+      remaining -= batch * perFragment;
+      massGained = massGained.add(whole.multiply(Decimal.of(batch, 0)));
+      fragments += batch;
+      state.stats.totalFragments += batch;
+      state.fragmentsOnStage += batch;
+      award(fragmentDust(state.stage), batch);
     }
 
-    if (state.killsOnFloor >= KILLS_PER_FLOOR) spawnGuardian(state);
-    else spawnMonster(state);
+    if (state.fragmentsOnStage >= FRAGMENTS_PER_STAGE) {
+      growToNextStage(state);
+      stagesGained += 1;
+      state.stats.stagesReached += 1;
+    } else {
+      spawnFragment(state);
+    }
   }
 
   const consumed = seconds - Math.max(0, remaining);
-  state.gold = state.gold.add(goldEarned);
-  state.lifetimeGold = state.lifetimeGold.add(goldEarned);
+  state.dust = state.dust.add(dustGathered);
+  state.lifetimeDust = state.lifetimeDust.add(dustGathered);
+  state.mass = state.mass.add(massGained);
   state.stats.playSeconds += consumed;
   if (state.blessingRemaining > 0) {
     state.blessingRemaining = Math.max(0, state.blessingRemaining - consumed);
@@ -261,13 +225,12 @@ export function advance(state: GameState, seconds: number): AdvanceReport {
 
   return {
     seconds: consumed,
-    goldEarned,
-    damageDealt,
-    kills,
-    guardiansFelled,
-    guardiansEscaped,
-    startFloor,
-    endFloor: state.floor,
+    dustGathered,
+    massGained,
+    fragments,
+    stagesGained,
+    startStage,
+    endStage: state.stage,
     truncated: events >= MAX_EVENTS,
   };
 }

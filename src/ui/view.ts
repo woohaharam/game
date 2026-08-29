@@ -24,7 +24,7 @@ import { computeStats } from '@game/stats';
 import type { GameState } from '@game/state';
 import { companionEntries, upgradeEntries } from './catalogue';
 import { el, setHidden, setText, setToggle } from './dom';
-import { CombatPanel, type FrameFeedback } from './panels/combat';
+import { StonePanel, type FrameFeedback } from './panels/stone';
 import { DescendPanel } from './panels/descend';
 import { OfflineModal, type OfflineSummary } from './panels/offline';
 import { ShopPanel } from './panels/shop';
@@ -43,11 +43,11 @@ type Tab = (typeof TABS)[number];
 export interface ViewCallbacks {
   /** Plays an effect. The view never touches the audio device itself. */
   readonly sound: (name: SoundName) => void;
-  readonly onDescend: () => void;
+  readonly onCompress: () => void;
   /** The view cannot retranslate itself in place; the host rebuilds it. */
   readonly onLanguageChange: (locale: Locale) => void;
   readonly onWatchForBlessing: () => void;
-  readonly onWatchForChest: () => void;
+  readonly onWatchForCache: () => void;
   readonly onDismissOffline: () => void;
   readonly onDoubleOffline: () => void;
   readonly onWipe: () => void;
@@ -55,7 +55,7 @@ export interface ViewCallbacks {
   readonly isSoundOn: () => boolean;
   readonly onExportSave: () => void;
   readonly onImportSave: () => void;
-  readonly onToggleAutoDelve: () => void;
+  readonly onToggleAutoRefine: () => void;
 }
 
 /** What survives a rebuild, so a language switch does not feel like a reset. */
@@ -69,7 +69,7 @@ export class GameView {
   private quantity: BuyQuantity = 1;
   private notation: Notation = 'suffix';
 
-  private readonly combat: CombatPanel;
+  private readonly stone: StonePanel;
   private readonly upgrades: ShopPanel;
   private readonly party: ShopPanel;
   private readonly descend: DescendPanel;
@@ -93,26 +93,27 @@ export class GameView {
     const num = (value: Decimal | number): string => this.num(value);
     const wantedLevels = (): number => this.wantedLevels();
 
-    this.combat = new CombatPanel({
+    this.stone = new StonePanel({
       state,
       num,
+      notation: () => this.notation,
       sound: callbacks.sound,
       onWatchForBlessing: callbacks.onWatchForBlessing,
-      onWatchForChest: callbacks.onWatchForChest,
+      onWatchForCache: callbacks.onWatchForCache,
     });
     const shopDeps = { state, num, wantedLevels, sound: callbacks.sound };
-    // The toggle lives on the upgrades panel because that is what it automates;
-    // companions are bought rarely and deliberately.
+    // The toggle lives on the refinement panel because that is what it automates;
+    // orbiters are bought rarely and deliberately.
     this.upgrades = new ShopPanel(upgradeEntries(), {
       ...shopDeps,
-      onToggleAutoDelve: callbacks.onToggleAutoDelve,
+      onToggleAutoRefine: callbacks.onToggleAutoRefine,
     });
     this.party = new ShopPanel(companionEntries(), shopDeps);
     this.descend = new DescendPanel({
       state,
       num,
       notation: () => this.notation,
-      onDescend: callbacks.onDescend,
+      onCompress: callbacks.onCompress,
       onCycleNotation: () => this.cycleNotation(),
       onLanguageChange: callbacks.onLanguageChange,
       onWipe: callbacks.onWipe,
@@ -131,7 +132,7 @@ export class GameView {
   // -- host interface -------------------------------------------------------
 
   setAdsAvailable(available: boolean): void {
-    this.combat.setAdsAvailable(available);
+    this.stone.setAdsAvailable(available);
   }
 
   setNotation(notation: Notation): void {
@@ -165,12 +166,12 @@ export class GameView {
 
   /** Hands one frame of simulation to the panel that can show it. */
   applyFeedback(feedback: FrameFeedback): void {
-    this.combat.feedback(feedback);
+    this.stone.feedback(feedback);
   }
 
   /** A one-off announcement over the stage, for events with no frame report. */
   announce(text: string): void {
-    this.combat.announce(text);
+    this.stone.announce(text);
   }
 
   // -- construction ---------------------------------------------------------
@@ -194,7 +195,7 @@ export class GameView {
 
     this.root.append(
       this.buildHeader(),
-      this.combat.mount(),
+      this.stone.mount(),
       this.buildTabs(),
       delvePanel,
       partyPanel,
@@ -305,14 +306,14 @@ export class GameView {
   update(): void {
     const stats = computeStats(this.state);
 
-    setText(this.gold, this.num(this.state.gold));
-    setText(this.relics, this.num(this.state.relics));
+    setText(this.gold, this.num(this.state.dust));
+    setText(this.relics, this.num(this.state.crystals));
     setText(
       this.relicMultiplier,
-      this.state.relics.isZero ? '' : formatMultiplier(stats.relicMultiplier),
+      this.state.crystals.isZero ? '' : formatMultiplier(stats.crystalMultiplier),
     );
 
-    this.combat.update();
+    this.stone.update();
 
     // Only the visible panel is repainted. The others are behind a `hidden`
     // attribute and will be brought up to date the moment they are shown.

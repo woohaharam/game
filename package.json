@@ -1,8 +1,8 @@
 {
-  "name": "deepdelve",
+  "name": "pebble",
   "version": "0.1.0",
   "private": true,
-  "description": "An idle fantasy dungeon RPG for the browser, built for web game portals.",
+  "description": "An idle growing game: turn a grain of sand into a galaxy, in the browser.",
   "type": "module",
   "license": "MIT",
   "engines": {

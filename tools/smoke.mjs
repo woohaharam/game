@@ -13,7 +13,7 @@
 import { chromium } from 'playwright';
 
 const url = (process.argv[2] ?? 'http://localhost:4173/') + '?ads=debug';
-const SAVE_KEY = 'deepdelve.save.v1';
+const SAVE_KEY = 'pebble.save';
 
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -36,12 +36,12 @@ context.on('page', (p) => {
 
 const page = await context.newPage();
 const read = async (p = page) => ({
-  gold: await p.textContent('.purse strong'),
-  depth: await p.textContent('.depth'),
-  enemy: await p.textContent('.enemy-name'),
-  hp: await p.textContent('.bartext'),
-  kills: await p.textContent('.killtext'),
-  dps: await p.textContent('.readout strong'),
+  dust: await p.textContent('.purse strong'),
+  stage: await p.textContent('.depth'),
+  fragment: await p.textContent('.enemy-name'),
+  mass: await p.textContent('.mass'),
+  progress: await p.textContent('.killtext'),
+  rate: await p.textContent('.readout strong'),
 });
 
 await page.goto(url, { waitUntil: 'networkidle' });
@@ -82,8 +82,8 @@ console.log('label pool size:', await page.$$eval('.float', (n) => n.length));
 
 // Auto-Delve is locked before the first descent, and says so rather than
 // offering a button that would do nothing.
-console.log('auto-delve hint:', (await page.textContent('.auto-hint')).trim());
-console.log('auto-delve enabled:', await page.isEnabled('.auto-toggle'));
+console.log('auto-refine hint:', (await page.textContent('.auto-hint')).trim());
+console.log('auto-refine enabled:', await page.isEnabled('.auto-toggle'));
 
 console.log('boosts visible:', await page.isVisible('.boosts'));
 await page.click('.boosts .ad:first-child');
@@ -105,7 +105,7 @@ const renderedRows = () =>
     (rs) => rs.filter((r) => r.getBoundingClientRect().height > 0).length,
   );
 
-for (const tab of ['동료', '심연', '강화']) {
+for (const tab of ['궤도', '압축', '연마']) {
   await page.click(`nav.tabs button:text-is("${tab}")`);
   await page.waitForTimeout(250);
   console.log(
@@ -113,7 +113,7 @@ for (const tab of ['동료', '심연', '강화']) {
   );
 }
 
-await page.click('nav.tabs button:text-is("심연")');
+await page.click('nav.tabs button:text-is("압축")');
 await page.waitForTimeout(300);
 console.log(
   'settings:',
@@ -197,7 +197,7 @@ await returning.screenshot({ path: 'smoke.png', fullPage: true });
 console.log('html lang:', await returning.getAttribute('html', 'lang'));
 console.log('title    :', await returning.title());
 const depthBefore = await returning.textContent('.depth');
-await returning.click('nav.tabs button:text-is("심연")');
+await returning.click('nav.tabs button:text-is("압축")');
 await returning.waitForTimeout(200);
 await returning.click('.settings button:text-is("언어: 한국어")');
 await returning.waitForTimeout(400);
@@ -219,7 +219,7 @@ console.log(
   (await returning.$$eval('nav.tabs button', (b) => b.map((x) => x.textContent))).join(' / '),
 );
 
-await returning.click('nav.tabs button:text-is("강화")');
+await returning.click('nav.tabs button:text-is("연마")');
 await returning.waitForTimeout(300);
 console.log(
   'shop rows:',
