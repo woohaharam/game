@@ -33,12 +33,27 @@ jobs:
       # has to be sure.
       - run: npm run verify
 
-      - name: Build
+      - name: Build Neon Depths
         # A project site is served from /<repo>/, so the asset base has to
         # match or every script tag 404s.
         env:
           PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/
         run: npx vite build
+
+      # DeepDelve ships alongside it at /<repo>/deepdelve/. It needs no base
+      # path of its own: portal builds are served from an unknown subdirectory,
+      # so its asset base is already relative, and that works here unchanged.
+      - name: Build DeepDelve
+        working-directory: deepdelve
+        run: |
+          npm ci
+          npm run verify
+          npm run build
+
+      - name: Collect both games
+        run: |
+          mkdir -p dist/deepdelve
+          cp -r deepdelve/dist/. dist/deepdelve/
 
       # `enablement: true` is deliberately NOT set. Creating a Pages site needs
       # admin scope, which the default GITHUB_TOKEN does not carry even with

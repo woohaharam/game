@@ -18,7 +18,10 @@ import globals from 'globals';
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    // `deepdelve/` is a separate project with its own flat config, tsconfig and
+    // CI job. Linting it from here would apply the wrong project service and
+    // report every file twice.
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'deepdelve/**'],
   },
 
   eslint.configs.recommended,
