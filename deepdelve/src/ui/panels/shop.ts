@@ -67,7 +67,9 @@ export class ShopPanel {
     const description = el('div', { class: 'desc' }, ['']);
 
     const root = el('div', { class: 'row', 'data-key': entry.key }, [
-      el('span', { class: 'icon' }, [entry.icon]),
+      // Decorative: the name sits immediately beside it, so announcing the
+      // emoji would only add noise for a screen reader.
+      el('span', { class: 'icon', 'aria-hidden': 'true' }, [entry.icon]),
       el('div', { class: 'about' }, [el('div', { class: 'name' }, [name, level]), description]),
       button,
     ]);

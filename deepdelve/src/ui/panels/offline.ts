@@ -35,12 +35,14 @@ export class OfflineModal {
   private floors!: HTMLElement;
   private cap!: HTMLElement;
   private double!: HTMLElement;
+  private dismissButton!: HTMLButtonElement;
 
   constructor(private readonly deps: OfflineModalDeps) {}
 
   mount(): HTMLElement {
     const dismiss = el('button', { class: 'primary', type: 'button' }, [t('offline.continue')]);
     dismiss.addEventListener('click', () => this.deps.onDismiss());
+    this.dismissButton = dismiss;
 
     this.double = el('button', { class: 'ad', type: 'button' }, [t('offline.double')]);
     this.double.addEventListener('click', () => this.deps.onDouble());
@@ -79,6 +81,10 @@ export class OfflineModal {
     setText(this.cap, summary.cappedOut ? t('offline.cap') : '');
     setHidden(this.double, !summary.canDouble);
     setHidden(this.backdrop, false);
+    // After it is shown, not before: focus does not move to a hidden element,
+    // and a keyboard user opening the game would otherwise be left behind the
+    // dialog with no obvious way through it.
+    this.dismissButton.focus();
   }
 
   hide(): void {

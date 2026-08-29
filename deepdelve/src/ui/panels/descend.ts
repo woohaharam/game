@@ -24,6 +24,8 @@ export interface DescendPanelDeps {
   readonly onWipe: () => void;
   readonly onToggleSound: () => void;
   readonly isSoundOn: () => boolean;
+  readonly onExportSave: () => void;
+  readonly onImportSave: () => void;
 }
 
 export class DescendPanel {
@@ -57,6 +59,16 @@ export class DescendPanel {
     this.soundButton = el('button', { class: 'quiet', type: 'button' }, ['']);
     this.soundButton.addEventListener('click', () => this.deps.onToggleSound());
 
+    const exportButton = el('button', { class: 'quiet', type: 'button' }, [
+      t('settings.export'),
+    ]);
+    exportButton.addEventListener('click', () => this.deps.onExportSave());
+
+    const importButton = el('button', { class: 'quiet', type: 'button' }, [
+      t('settings.import'),
+    ]);
+    importButton.addEventListener('click', () => this.deps.onImportSave());
+
     this.pending = el('strong', {}, ['0']);
     this.hint = el('p', { class: 'lock' }, ['']);
     this.statList = el('dl', { class: 'stats' });
@@ -77,6 +89,8 @@ export class DescendPanel {
         this.languageButton,
         this.notationButton,
         this.soundButton,
+        exportButton,
+        importButton,
         wipe,
       ]),
     ]);

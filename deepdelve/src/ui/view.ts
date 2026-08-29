@@ -53,6 +53,8 @@ export interface ViewCallbacks {
   readonly onWipe: () => void;
   readonly onToggleSound: () => void;
   readonly isSoundOn: () => boolean;
+  readonly onExportSave: () => void;
+  readonly onImportSave: () => void;
 }
 
 /** What survives a rebuild, so a language switch does not feel like a reset. */
@@ -110,6 +112,8 @@ export class GameView {
       onWipe: callbacks.onWipe,
       onToggleSound: callbacks.onToggleSound,
       isSoundOn: callbacks.isSoundOn,
+      onExportSave: callbacks.onExportSave,
+      onImportSave: callbacks.onImportSave,
     });
     this.offline = new OfflineModal({
       num,
@@ -166,15 +170,17 @@ export class GameView {
   // -- construction ---------------------------------------------------------
 
   mount(): void {
-    const delvePanel = el('section', { class: 'panel' }, [
+    const delvePanel = el('section', { class: 'panel', role: 'tabpanel', id: 'panel-delve' }, [
       this.buildQuantitySelector(),
       this.upgrades.mount(),
     ]);
-    const partyPanel = el('section', { class: 'panel' }, [
+    const partyPanel = el('section', { class: 'panel', role: 'tabpanel', id: 'panel-party' }, [
       el('p', { class: 'hint' }, [t('party.hint')]),
       this.party.mount(),
     ]);
     const descendPanel = this.descend.mount();
+    descendPanel.setAttribute('role', 'tabpanel');
+    descendPanel.id = 'panel-descend';
 
     this.panels.set('delve', delvePanel);
     this.panels.set('party', partyPanel);
@@ -221,9 +227,13 @@ export class GameView {
 
     return el(
       'nav',
-      { class: 'tabs' },
+      { class: 'tabs', role: 'tablist' },
       TABS.map((tab) => {
-        const button = el('button', { class: 'tab', type: 'button' }, [labels[tab]]);
+        const button = el(
+          'button',
+          { class: 'tab', type: 'button', role: 'tab', 'aria-controls': `panel-${tab}` },
+          [labels[tab]],
+        );
         button.addEventListener('click', () => this.selectTab(tab));
         this.tabButtons.set(tab, button);
         return button;
@@ -253,7 +263,11 @@ export class GameView {
     for (const candidate of TABS) {
       const button = this.tabButtons.get(candidate);
       const panel = this.panels.get(candidate);
-      if (button !== undefined) setToggle(button, 'active', candidate === tab);
+      if (button !== undefined) {
+        setToggle(button, 'active', candidate === tab);
+        // Assistive technology reads the selected state, not the class.
+        button.setAttribute('aria-selected', String(candidate === tab));
+      }
       if (panel !== undefined) setHidden(panel, candidate !== tab);
     }
   }

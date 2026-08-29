@@ -22,10 +22,29 @@ import {
 } from '@core/i18n';
 import { formatNumber, type Notation } from '@core/format';
 import { createStore } from '@core/storage';
+import { SAVE_KEY } from '@game/save';
+
+/**
+ * Best-effort clipboard write.
+ *
+ * `navigator.clipboard` is declared unconditionally by `lib.dom` but is absent
+ * over plain HTTP and frequently blocked inside a cross-origin iframe, which is
+ * exactly where a portal build lives. Failure is not worth reporting: the code
+ * is on screen either way.
+ */
+async function copyToClipboard(text: string): Promise<void> {
+  const { clipboard } = navigator as unknown as { clipboard?: Clipboard };
+  try {
+    await clipboard?.writeText(text);
+  } catch {
+    // Blocked or unavailable; the prompt is the real delivery mechanism.
+  }
+}
 import { applyOfflineProgress, doubleOfflineEarnings, type OfflineResult } from '@game/offline';
 import { canDescend, descend } from '@game/prestige';
 import { grantBlessing, grantChest } from '@game/rewards';
-import { load, save, wipe } from '@game/save';
+import { decode, encode, load, save, wipe } from '@game/save';
+import { fromTransferCode, toTransferCode } from '@game/transfer';
 import { advance } from '@game/simulation';
 import { GameAudio } from '@platform/audio';
 import { detectAdProvider } from '@platform/portals';
@@ -122,6 +141,40 @@ function boot(): void {
       if (audio.isEnabled()) audio.unlock();
     },
     isSoundOn: () => audio.isEnabled(),
+    onExportSave: () => {
+      save(store, state);
+      const code = toTransferCode(encode(state));
+      // `prompt` rather than the clipboard API on purpose: the game runs inside
+      // a portal's iframe, where clipboard writes are frequently blocked with no
+      // way to detect it beforehand. A prompt pre-filled with the code always
+      // works, and the player can select it themselves. The clipboard is still
+      // tried, as a convenience when it happens to be permitted.
+      void copyToClipboard(code);
+      globalThis.prompt(t('settings.exportPrompt'), code);
+    },
+    onImportSave: () => {
+      const pasted = globalThis.prompt(t('settings.importPrompt'), '');
+      if (pasted === null) return;
+
+      const result = fromTransferCode(pasted);
+      if (!result.ok) {
+        globalThis.alert(t('settings.importBad'));
+        return;
+      }
+
+      // Decoded before the confirmation, so a code that turns out to be
+      // unreadable never gets as far as asking the player to sacrifice a run.
+      const incoming = decode(result.payload);
+      if (!incoming.loaded) {
+        globalThis.alert(t('settings.importBad'));
+        return;
+      }
+      if (!globalThis.confirm(t('settings.importConfirm'))) return;
+
+      store.write(SAVE_KEY, result.payload);
+      globalThis.alert(t('settings.importOk'));
+      globalThis.location.reload();
+    },
     onDescend: () => {
       if (!canDescend(state)) return;
       const confirmed = globalThis.confirm(t('descend.confirm'));
@@ -294,4 +347,48 @@ function boot(): void {
   requestAnimationFrame(frame);
 }
 
-boot();
+/**
+ * Renders a way out when the game cannot start.
+ *
+ * Without this a boot exception leaves an empty page: no message, no recourse,
+ * and — since the most likely cause is a save the loader could not cope with —
+ * no way for the player to clear the thing that is blocking them. It is a
+ * dozen lines of plain DOM on purpose, because it has to work in exactly the
+ * situation where the rest of the code did not.
+ */
+function renderBootFailure(error: unknown): void {
+  console.error('DeepDelve failed to start', error);
+
+  const root = document.querySelector('#app');
+  if (root === null) return;
+
+  const heading = document.createElement('h1');
+  heading.textContent = t('boot.failed');
+
+  const hint = document.createElement('p');
+  hint.textContent = t('boot.failedHint');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'danger';
+  button.textContent = t('boot.erase');
+  button.addEventListener('click', () => {
+    try {
+      wipe(createStore());
+    } catch {
+      // Storage may be the reason we are here; reloading is still worth a try.
+    }
+    globalThis.location.reload();
+  });
+
+  const panel = document.createElement('div');
+  panel.className = 'boot-failure';
+  panel.append(heading, hint, button);
+  root.replaceChildren(panel);
+}
+
+try {
+  boot();
+} catch (error) {
+  renderBootFailure(error);
+}

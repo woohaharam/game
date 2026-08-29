@@ -113,6 +113,37 @@ button:disabled {
   cursor: default;
 }
 
+/*
+ * Keyboard focus was invisible before this. `:focus-visible` rather than
+ * `:focus` so the ring appears for keyboard navigation without outlining every
+ * button a thumb touches — the reason the default outline gets removed in the
+ * first place.
+ */
+:focus-visible {
+  outline: 2px solid var(--relic);
+  outline-offset: 2px;
+}
+
+.boot-failure {
+  margin: auto;
+  padding: 24px;
+  max-width: 320px;
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+
+.boot-failure h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.boot-failure p {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
 /* -- top bar ------------------------------------------------------------- */
 
 .topbar {
@@ -585,6 +616,12 @@ button.descend {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.settings button {
+  /* Six settings at two columns; the labels are long in both languages. */
+  font-size: 12px;
+  padding: 10px 8px;
 }
 
 button.quiet {

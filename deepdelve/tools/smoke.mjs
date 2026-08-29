@@ -110,7 +110,42 @@ for (const tab of ['동료', '심연', '강화']) {
 
 await page.click('nav.tabs button:text-is("심연")');
 await page.waitForTimeout(300);
-console.log('sound button:', await page.textContent('.settings button:nth-child(3)'));
+console.log(
+  'settings:',
+  (await page.$$eval('.settings button', (b) => b.map((x) => x.textContent))).join(' / '),
+);
+
+// Save transfer: export copies a code out, import rejects a damaged one.
+// Dialogs are queued through one handler; registering several `once` listeners
+// races, because Playwright dispatches them all to the first dialog.
+const dialogScript = [];
+page.on('dialog', async (dialog) => {
+  const step = dialogScript.shift();
+  if (step === undefined) return dialog.dismiss();
+  return step(dialog);
+});
+
+dialogScript.push(async (d) => {
+  const code = d.defaultValue();
+  console.log('export code:', code.slice(0, 24), '…', code.length, 'chars');
+  await d.dismiss();
+});
+await page.click('.settings button:text-is("세이브 코드 복사")');
+await page.waitForTimeout(500);
+
+dialogScript.push(async (d) => d.accept('DD1.bogus.00000000'));
+dialogScript.push(async (d) => {
+  console.log('damaged code rejected with:', d.message());
+  await d.accept();
+});
+await page.click('.settings button:text-is("세이브 코드 불러오기")');
+await page.waitForTimeout(700);
+
+// Accessibility surface.
+console.log('tabs with aria-selected:', await page.$$eval('nav.tabs [role="tab"]', (n) => n.map((x) => x.getAttribute('aria-selected')).join(',')));
+console.log('progressbars:', await page.$$eval('[role="progressbar"]', (n) => n.length));
+console.log('health aria-valuenow:', await page.getAttribute('.healthbar', 'aria-valuenow'));
+
 console.log('descend hint:', (await page.textContent('.panel:not([hidden]) .lock')).trim());
 console.log(
   'stat values:',

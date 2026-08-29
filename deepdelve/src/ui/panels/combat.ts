@@ -65,6 +65,7 @@ export class CombatPanel {
   private stage!: HTMLElement;
   private sprite!: HTMLElement;
   private enemyName!: HTMLElement;
+  private healthBar!: HTMLElement;
   private healthFill!: HTMLElement;
   private healthText!: HTMLElement;
   private timer!: HTMLElement;
@@ -90,6 +91,17 @@ export class CombatPanel {
     this.enemyName = el('div', { class: 'enemy-name' }, ['']);
     this.healthFill = el('div', { class: 'fill' });
     this.healthText = el('span', { class: 'bartext' }, ['']);
+    this.healthBar = el(
+      'div',
+      {
+        class: 'healthbar',
+        role: 'progressbar',
+        'aria-label': t('a11y.enemyHealth'),
+        'aria-valuemin': '0',
+        'aria-valuemax': '100',
+      },
+      [this.healthFill, this.healthText],
+    );
     this.timerText = el('span', {}, ['']);
     this.timer = el('div', { class: 'timer' }, [this.timerText]);
     this.killFill = el('div', { class: 'fill' });
@@ -101,7 +113,7 @@ export class CombatPanel {
       this.effects.mount(),
       this.sprite,
       this.enemyName,
-      el('div', { class: 'healthbar' }, [this.healthFill, this.healthText]),
+      this.healthBar,
       this.timer,
     ]);
 
@@ -109,7 +121,11 @@ export class CombatPanel {
       el('div', { class: 'floorline' }, [this.zone, this.depth]),
       this.stage,
       el('div', { class: 'progressline' }, [
-        el('div', { class: 'killbar' }, [this.killFill]),
+        el(
+          'div',
+          { class: 'killbar', role: 'progressbar', 'aria-label': t('a11y.floorProgress') },
+          [this.killFill],
+        ),
         this.killText,
       ]),
       el('div', { class: 'readout' }, [
@@ -195,6 +211,7 @@ export class CombatPanel {
       : Math.min(1, Math.max(0, state.enemyHealthRemaining.divide(maxHealth).toNumber()));
     setVariable(this.healthFill, '--fill', `${(fraction * 100).toFixed(1)}%`);
     setText(this.healthText, num(state.enemyHealthRemaining));
+    this.healthBar.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
 
     setToggle(this.stage, 'guardian', state.fightingGuardian);
     setText(
