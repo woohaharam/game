@@ -26,7 +26,8 @@
     "build:poki": "npm run typecheck && DD_PORTAL=poki vite build",
     "package": "node tools/package.mjs",
     "package:crazygames": "node tools/package.mjs crazygames",
-    "package:poki": "node tools/package.mjs poki"
+    "package:poki": "node tools/package.mjs poki",
+    "ladder": "node tools/ladder.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

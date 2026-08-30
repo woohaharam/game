@@ -133,6 +133,29 @@ measured afterwards — at which point the measurement showed the runs convergin
 The derivation had been right about the shape and wrong about which quantity it
 applied to. The probe exists because of that.
 
+## Drawing the stone
+
+`src/game/content/appearance.ts` says what a form looks like — colour,
+roughness, crater count, whether it has rings — and `src/ui/stone-canvas.ts`
+decides how to put that on a canvas. Keeping them apart means the ladder can be
+re-tuned without touching rendering code.
+
+Two properties matter more than the drawing. The shape is **stable**: seeded
+from the form index, so the same stage always produces the same silhouette and
+craters. `Math.random` would make the thing the player is growing appear to
+writhe. And the seed comes from the _form_, not the stage, so the stone keeps
+its identity while it grows and only changes when it becomes something else.
+
+The silhouette uses two frequencies rather than pure noise — a slow wobble for
+overall lopsidedness, a fast one for facets — because pure noise reads as a blob
+and a rock needs faces. Craters are biased inwards by `sqrt(random())`, since
+one drawn at the very edge reads as a bite rather than a dent. One light source,
+upper left, for every form: consistency is what stops a ladder of twenty bodies
+looking like twenty unrelated drawings.
+
+`npm run ladder` renders the whole ladder to one sheet against the dev server,
+which is the only way to judge the progression as a progression.
+
 ## The view
 
 Built once, updated in place. Nothing is created, destroyed, or reordered while

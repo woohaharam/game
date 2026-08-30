@@ -49,6 +49,21 @@ eight hours watched by variance alone. The suite asserts that one 7,200-second
 step and 28,800 frame-sized steps reach identical fragment counts and dust
 within 1e-9.
 
+**The stone is drawn, not downloaded.** Twenty hand-drawn sprites would be most
+of a bundle a portal player downloads before anything is playable, and they
+could not scale to a phone's pixel ratio. So the stone is generated: an
+irregular lump early on, rounding out as it gains mass — which is what gravity
+actually does, so the silhouette becoming a circle _is_ the story of the game —
+then craters, continents, an atmosphere, rings, a corona, and finally arms.
+
+The shape is seeded from the form rather than rolled, so the same stage always
+produces the same silhouette and the thing the player is growing never appears
+to writhe. A galaxy is not drawn as a rounder rock but as a different kind of
+thing entirely: no silhouette, no lit side, just a core and arms. `npm run
+ladder` renders every form side by side, which is the only way to judge whether
+the progression reads as one thing becoming another rather than as twenty
+unrelated drawings.
+
 **Mass is not the currency.** The stone's mass only ever goes up — it is the
 thing being grown and the number the player is here for. Dust, sieved out of
 fragments as they land, is what gets spent. Making the stone shrink when you

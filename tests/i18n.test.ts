@@ -10,6 +10,8 @@ import {
   t,
 } from '../src/core/i18n';
 import { en } from '../src/core/strings/en';
+import { FORM_APPEARANCE, appearanceForForm } from '../src/game/content/appearance';
+import { FORM_COUNT } from '../src/game/content/stages';
 import { ko } from '../src/core/strings/ko';
 
 afterEach(() => setLocale('en'));
@@ -160,5 +162,45 @@ describe('locale detection', () => {
   it('tracks the active locale', () => {
     setLocale('ko');
     expect(getLocale()).toBe('ko');
+  });
+});
+
+describe('form appearance', () => {
+  it('has a look for every named form', () => {
+    // A form with a name and no appearance renders as a blank canvas, which is
+    // the kind of gap nothing else would report.
+    expect(FORM_APPEARANCE.length).toBe(FORM_COUNT);
+    for (let i = 0; i < FORM_COUNT; i += 1) {
+      const key = `form.${i}` as keyof typeof en;
+      expect(en[key], `form ${i}`).toBeDefined();
+    }
+  });
+
+  it('wraps rather than reaching past either end of the ladder', () => {
+    for (const index of [-1, -20, -1000, 0, 19, 20, 4021]) {
+      expect(appearanceForForm(index), `form ${index}`).toBeDefined();
+    }
+    // Negative indices must wrap forwards, not off the front: `%` keeps the
+    // dividend's sign in JavaScript.
+    expect(appearanceForForm(-1)).toBe(appearanceForForm(FORM_COUNT - 1));
+    expect(appearanceForForm(FORM_COUNT)).toBe(appearanceForForm(0));
+  });
+
+  it('rounds the stone out as it gains mass', () => {
+    // The silhouette becoming a circle is the story of the game, so the trend
+    // has to hold even if individual forms are re-tuned.
+    const early = appearanceForForm(0).roughness;
+    const middle = appearanceForForm(10).roughness;
+    const late = appearanceForForm(FORM_COUNT - 1).roughness;
+    expect(early).toBeGreaterThan(middle);
+    expect(middle).toBeGreaterThan(late);
+    expect(late).toBe(0);
+  });
+
+  it('keeps light for the late forms, where it is the payoff', () => {
+    expect(appearanceForForm(0).glow).toBeNull();
+    expect(appearanceForForm(2).glow).toBeNull();
+    expect(appearanceForForm(FORM_COUNT - 2).glow).not.toBeNull();
+    expect(appearanceForForm(FORM_COUNT - 1).spiral).toBe(true);
   });
 });

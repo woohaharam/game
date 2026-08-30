@@ -63,8 +63,19 @@ const STAGES_PER_FORM = 4;
 /** Named forms, from a grain of sand to a galaxy. */
 export const FORM_COUNT = 20;
 
-function formIndex(stage: number): number {
+export function formIndex(stage: number): number {
   return Math.max(0, Math.floor((stage - 1) / STAGES_PER_FORM));
+}
+
+/**
+ * How far through its current form the stone is, from 0 to 1.
+ *
+ * Drives the on-screen size within a form, so growth is visible between the
+ * moments the shape changes. Without it the stone is static for four stages at
+ * a time, which is most of the game.
+ */
+export function formProgress(stage: number): number {
+  return ((stage - 1) % STAGES_PER_FORM) / STAGES_PER_FORM;
 }
 
 /** What the stone currently *is*, which is what the player actually watches. */
@@ -78,41 +89,6 @@ export function formName(stage: number): string {
   // Past a galaxy there is nowhere left to go, so the ladder starts again one
   // universe out rather than inventing names nobody has a picture of.
   return t('form.beyond', { form: name, lap: lap + 1 });
-}
-
-/**
- * What the stone looks like at each form.
- *
- * Emoji rather than art, for the same reason nothing else here is downloaded:
- * the bundle is the product on a portal, and a sprite sheet would be most of
- * it. They also happen to carry the ladder better than a drawing at 52px would
- * — everyone already knows what a galaxy is.
- */
-const FORM_ICONS = [
-  '·',
-  '🪨',
-  '🪨',
-  '🪨',
-  '🗿',
-  '🗿',
-  '⛰️',
-  '⛰️',
-  '🏔️',
-  '🏔️',
-  '🌍',
-  '☄️',
-  '☄️',
-  '🌕',
-  '🪐',
-  '🪐',
-  '🟤',
-  '⭐',
-  '💥',
-  '🌌',
-] as const;
-
-export function formIcon(stage: number): string {
-  return FORM_ICONS[formIndex(stage) % FORM_COUNT] ?? '🪨';
 }
 
 type FormOrdinal =

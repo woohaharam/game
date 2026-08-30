@@ -14,13 +14,14 @@
 import type { Decimal } from '@core/decimal';
 import type { Notation } from '@core/format';
 import { duration, mass, t } from '@core/i18n';
-import { FRAGMENTS_PER_STAGE, formIcon, formName, fragmentName } from '@game/content/stages';
+import { FRAGMENTS_PER_STAGE, formName, fragmentName } from '@game/content/stages';
 import type { SoundName } from '@platform/audio';
 import { BLESSING_DURATION_SECONDS, cacheValue } from '@game/rewards';
 import { computeStats } from '@game/stats';
 import { wholeFragmentMass, type GameState } from '@game/state';
 import { el, setHidden, setText, setToggle, setVariable } from '../dom';
 import { EffectsLayer, prefersReducedMotion } from '../effects';
+import { StoneRenderer } from '../stone-canvas';
 
 export interface StonePanelDeps {
   readonly state: GameState;
@@ -55,6 +56,7 @@ const ABSORB_FLASH_MS = 140;
 export class StonePanel {
   private adsAvailable = false;
   private readonly effects = new EffectsLayer(prefersReducedMotion());
+  private readonly renderer = new StoneRenderer(prefersReducedMotion());
   private pendingMass: Decimal | null = null;
   private lastMassLabelAt = 0;
   private flashUntil = 0;
@@ -62,7 +64,7 @@ export class StonePanel {
   private form!: HTMLElement;
   private stageLabel!: HTMLElement;
   private body!: HTMLElement;
-  private icon!: HTMLElement;
+  private icon!: HTMLCanvasElement;
   private massLabel!: HTMLElement;
   private fragmentLabel!: HTMLElement;
   private drawBar!: HTMLElement;
@@ -84,7 +86,7 @@ export class StonePanel {
   mount(): HTMLElement {
     this.form = el('span', { class: 'zone' }, ['']);
     this.stageLabel = el('span', { class: 'depth' }, ['']);
-    this.icon = el('div', { class: 'sprite' }, ['·']);
+    this.icon = this.renderer.mount();
     this.massLabel = el('div', { class: 'mass' }, ['']);
     this.fragmentLabel = el('div', { class: 'enemy-name' }, ['']);
 
@@ -197,7 +199,7 @@ export class StonePanel {
 
     setText(this.form, formName(state.stage));
     setText(this.stageLabel, t('stone.stage', { n: state.stage }));
-    setText(this.icon, formIcon(state.stage));
+    this.renderer.draw(state.stage, now);
     setText(this.massLabel, mass(state.mass, notation));
 
     const whole = wholeFragmentMass(state);

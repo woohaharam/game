@@ -212,11 +212,14 @@ button:disabled {
   background: radial-gradient(circle at 50% 30%, #3a2230, var(--stone-700) 70%);
 }
 
-.sprite {
-  font-size: 52px;
-  line-height: 1;
-  /* Idle breathing, so a game that is mostly waiting never looks frozen. */
-  animation: bob 2.4s ease-in-out infinite;
+.stone-canvas {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  aspect-ratio: 1;
+  /* Breathing under the rotation, so a game that is mostly waiting never
+     looks frozen even when the stone is too small to see turning. */
+  animation: bob 4s ease-in-out infinite;
 }
 
 @keyframes bob {
@@ -225,12 +228,12 @@ button:disabled {
     transform: translateY(0) scale(1);
   }
   50% {
-    transform: translateY(-6px) scale(1.04);
+    transform: translateY(-4px) scale(1.02);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sprite {
+  .stone-canvas {
     animation: none;
   }
 }
